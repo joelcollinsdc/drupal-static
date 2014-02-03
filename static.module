@@ -162,9 +162,9 @@ function static_save_info($info) {
  * Generate a filename
  */
 function static_generate_filename($alias) {
-  // Special case for index.html
+  // Special case for generate.html
   if ($alias == '') {
-    return 'index.html';
+    return 'generate.html';
   }
   //For now just append .html but will need to handle querystrings later.
   return $alias . '.html';
@@ -447,7 +447,7 @@ function static_delete_dir($dir) {
  * Creates and sets a batch for generating items.
  *
  * @param int $batch_size
- *   Number of items to index per batch.
+ *   Number of items to generate per batch.
  *
  * @return bool
  *   Whether the batch was created and set successfully.
@@ -481,7 +481,7 @@ function _static_batch_generating_create($batch_size) {
  * Batch API callback for the generating functionality.
  *
  * @param integer $batch_size
- *   Number of items to index per batch.
+ *   Number of items to generate per batch.
  * @param $context
  *   An array (or object implementing ArrayAccess) containing the batch context.
  */
@@ -504,38 +504,37 @@ function _static_batch_generating_callback($batch_size, &$context) {
     $context['results']['not generated'] = 0;
   }
 
-  // Number of items to index for this run.
-  $to_index = min($context['sandbox']['limit'] - $context['sandbox']['progress'], $context['sandbox']['batch_size']);
+  // Number of items to generate for this run.
+  $to_generate = min($context['sandbox']['limit'] - $context['sandbox']['progress'], $context['sandbox']['batch_size']);
 
   // Index the items.
   try {
-    $indexed = static_generate_files($to_index);
-    $context['results']['indexed'] += $indexed;
+    $generated = static_generate_files($to_generate);
+    $context['results']['generated'] += $generated;
   }
-  catch (SearchApiException $e) {
-    watchdog_exception('search_api', $e);
-    $vars['@message'] = $e->getMessage();
-    $context['message'] = t('An error occurred during indexing: @message.', $vars);
+  catch (Exception $e) {
+    watchdog_exception('static', $e);
+    $vars['@message'] = $e->message;
+    $context['message'] = t('An error occurred during generating: @message.', $vars);
     $context['finished'] = 1;
-    $context['results']['not indexed'] += $context['sandbox']['limit'] - $context['sandbox']['progress'];
+    $context['results']['not generated'] += $context['sandbox']['limit'] - $context['sandbox']['progress'];
     return;
   }
 
   // Display progress message.
-  if ($indexed > 0) {
-    $format_plural = $context['results']['drush'] === TRUE ? '_search_api_drush_format_plural' : 'format_plural';
-    $context['message'] = $format_plural($context['results']['indexed'], 'Successfully indexed 1 item.', 'Successfully indexed @count items.');
+  if ($generated > 0) {
+    $context['message'] = format_plural($context['results']['generated'], 'Successfully generated 1 item.', 'Successfully generated @count items.');
   }
 
-  // Some items couldn't be indexed.
-  if ($indexed !== $to_index) {
-    $context['results']['not indexed'] += $to_index - $indexed;
+  // Some items couldn't be generated.
+  if ($generated !== $to_generate) {
+    $context['results']['not generated'] += $to_generate - $generated;
   }
 
-  $context['sandbox']['progress'] += $to_index;
+  $context['sandbox']['progress'] += $to_generate;
 
-  // Everything has been indexed.
-  if ($indexed === 0 || $context['sandbox']['progress'] >= $context['sandbox']['limit']) {
+  // Everything has been generated.
+  if ($generated === 0 || $context['sandbox']['progress'] >= $context['sandbox']['limit']) {
     $context['finished'] = 1;
   }
   else {
