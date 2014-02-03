@@ -276,9 +276,11 @@ function static_copy_linked_files($data) {
   $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
   $files_dir = $wrapper->getDirectoryPath();
   $srcs = array();
+  // Match src="/{anything}"
   preg_match_all('/src="\/([^"]*)"/i', $data, $srcs);
   $hrefs = array();
-  preg_match_all('/href="\/([^"]*.\.(' . variable_get('static_href_link_types', 'ico|css|pdf|doc') . '))"/i', $data, $hrefs);
+  // Match href="/{anything}.{ico|css|pdf|doc}(?{anything})" () querystring is optional
+  preg_match_all('/href="\/([^"]*.\.(' . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ')(\?[^"]*.)?)"/i', $data, $hrefs);
   $matches = array_merge($srcs[1], $hrefs[1]);
   foreach($matches as $match) {
     // Strip off the querystring.
