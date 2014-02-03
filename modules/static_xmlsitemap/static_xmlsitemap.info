@@ -1,0 +1,8 @@
+name = Static XMLSitemap
+description = Uses XMLsitemap to discover pages for the static module.
+package = Performance and scalability
+core = 7.x
+
+dependencies[] = static
+dependencies[] = xmlsitemap
+

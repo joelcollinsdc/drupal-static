@@ -1,0 +1,64 @@
+<?php
+
+/* 
+ * Use the xmlsitemap link info to fill out a list of pages to be built.
+ */
+
+/**
+ * Implements hook_esi_block_url_alter(&$url)
+ */
+function static_esi_esi_block_url_alter(&$url) {
+  // Since we don't have querystrings, roles or users on a static site,
+  // we don't need those parts in the url.
+  $parts = explode('/', $url);
+  unset($parts[3]);
+  unset($parts[4]);
+  unset($parts[5]);
+  $url = implode('/', $parts);
+  static_track_paths(array($url));
+}
+
+/**
+ * Implements hook_context_block_url_alter(&$url)
+ */
+function static_esi_esi_context_url_alter($url) {
+  // Since we don't have querystrings, roles or users on a static site,
+  // we don't need those parts in the url.
+  $parts = explode('/', $url);
+  unset($parts[3]);
+  unset($parts[4]);
+  unset($parts[5]);
+  $url = implode('/', $parts);
+  static_track_paths(array($url));
+}
+
+/**
+ * Implements hook_panels_block_url_alter(&$url)
+ */
+function static_esi_esi_panels_url_alter($url) {
+  // TODO: Do we need to do something to the url to simplify it?
+  static_track_paths(array($url));
+}
+
+/**
+ * Implements hook_static_refresh_paths().
+ * Refresh all paths for the static module.
+ */
+function static_esi_static_refresh_paths() {
+  // Not sure what to do here or if this is necessary. As pages are being
+  // generated all links should be captured by the above hooks.
+  return array();
+}
+
+// Need more ways to clear the esi static cache files.
+// Views blocks
+// Panel blocks
+// Other module blocks
+// Perhaps just set them to refresh on cron every 15 minutes?
+
+/**
+ * When a block is saved, clear the static cache.
+ */
+function static_esi_block_save($delta = 0, $edit = array()) {
+  
+}

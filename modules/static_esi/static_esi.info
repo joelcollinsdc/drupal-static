@@ -1,0 +1,8 @@
+name = Static Edge Side Includes
+description = Generate static paths for Edge side includes from the esi module.
+package = Performance and scalability
+core = 7.x
+
+dependencies[] = static
+dependencies[] = esi
+

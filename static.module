@@ -33,7 +33,35 @@ define('STATIC_NORMAL_DIR', 'normal');
 /**
  * Define the default cron limit
  */
-define('STATIC_DEFAULT_CRON_LIMIT', 30);
+define('STATIC_DEFAULT_CRON_LIMIT', 60);
+
+/**
+ * Use this function to tell the static module to track paths. This is useful
+ * for submodules to make sure that all paths get included.
+ */
+function static_track_paths($paths) {
+  // There probably is some way to optimize this.
+  foreach($paths as $path) {
+    static_track_path($path);
+  }
+}
+
+/**
+ * Track a single path.
+ * 
+ * For multiple paths, use static_track_paths
+ */
+function static_track_path($path) {
+  $info = static_get_info($path);
+  // Only process new paths
+  if (!isset($info['id'])) {
+    // Put URLs in a queue for processing by cron
+    $queue = DrupalQueue::get('static');
+    $queue->createItem($info['path']);
+    static_save_info($info);
+  }
+}
+
 /**
  * Implements hook_menu().
  */
@@ -77,12 +105,26 @@ function static_menu() {
  * Load a static path info
  */
 function static_get_info($path) {
-  // Ensure this is the normal path.
-  $path = drupal_get_normal_path($path);
-  
-  $path_alias = path_load(array('source' => drupal_get_normal_path($path)));
-  
-  $path_alias['source'] = $path;
+  // Special case for the front page since it is weird.
+  if ($path == '' || $path == '<front>') {
+    $path_alias = array(
+      'source' => '<front>',
+      'alias' => '',
+    );
+  }
+  else {
+    // Ensure this is the normal path.
+    $path = drupal_get_normal_path($path);
+
+    $path_alias = path_load(array('source' => drupal_get_normal_path($path)));
+
+    if (!$path_alias) {
+      $path_alias = array(
+        'source' => $path,
+        'alias' => $path,
+      );
+    }
+  }
 
   $info = db_select('static', 's')
     ->fields('s')
@@ -210,6 +252,7 @@ function static_generate_file($path) {
  * Callback to generate multiple files based on files with status=0
  */
 function static_generate_files($limit) {
+  // May be a way to do multiple requests at a time to optimize this.
   $results = db_select('static', 's')
       ->fields('s')
       ->condition('status', STATIC_EXPIRED)
@@ -277,8 +320,8 @@ function static_write_file($filename, $data) {
     return FALSE;
   }
 
-  // chmod file so webserver can send it out.
-  drupal_chmod($filename);
+  // chmod file so webserver can send it out. Set execute so mod_includes will process.
+  drupal_chmod($filename, 0755);
   return TRUE;
 }
 
@@ -356,6 +399,9 @@ function static_in_cache_dir($file) {
  * Set all pages to be regenerated
  */
 function static_regenerate() {
+  // Make sure we know about all paths in case some got missed.
+  static_refresh_paths();
+  
   db_update('static')
     ->fields(array(
       'status' => 0,
@@ -495,4 +541,45 @@ function _static_batch_generating_callback($batch_size, &$context) {
   else {
     $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['limit'];
   }
+}
+
+/**
+ * Refresh all known paths for the static module
+ */
+function static_refresh_paths() {
+  // On larger sites this might run into php limit issues (memory and time).
+  $paths = module_invoke_all('static_refresh_paths');
+  static_track_paths($paths);
+}
+
+/**
+ * This should probably be a patch to the esi module.
+ * 
+ * Note: In apache 2.x the include directive does not have a space between the
+ * html comment and the include directive. This is different than apache 1.x
+ * 
+ * See: http://forums.cpanel.net/f5/ssi-problem-apache-2-a-131809.html
+ * 
+ * Apache 1.x <!--# include virtual="
+ * Apache 2.x <!--#include virtual="
+ * 
+ */
+
+/**
+ * Implements hook_esi_mode().
+ */
+function static_esi_mode() {
+  return array(
+    'ssi_apache2' => array(
+      'title' => 'SSI tag (Apache 2)',
+      'render' => 'static_esi_ssi_apache2_tag',
+    ),
+  );
+}
+
+/**
+ * Generate an ssi tag for apache2
+ */
+function static_esi_ssi_apache2_tag($url) {
+  return '<!--#include virtual="' . $url . '" -->';
 }
