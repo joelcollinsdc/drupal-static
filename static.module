@@ -144,6 +144,9 @@ function static_get_info($path) {
   // Alias may have changed. Record it here.
   $info['alias'] = $path_alias['alias'];
   
+  // Allow other modules to alter.
+  drupal_alter('static_info', $info);
+  
   return $info;
 }
 
@@ -161,13 +164,24 @@ function static_save_info($info) {
 /**
  * Generate a filename
  */
-function static_generate_filename($alias) {
-  // Special case for generate.html
-  if ($alias == '') {
-    return 'generate.html';
+function static_filename($info) {
+  // Special case for index.html
+  if ($info['alias'] == '') {
+    $filename = 'index.html';
   }
-  //For now just append .html but will need to handle querystrings later.
-  return $alias . '.html';
+  else {
+    $filename =  $info['alias'];
+    
+    // If the filename does not have .html, add it.
+    if (substr_compare($filename, '.html', -5, 5) !== 0) {
+      $filename .= '.html';
+    }
+  }
+  
+  // Allow other modules to modify the filename.
+  drupal_alter('static_filename', $filename, $info);
+  
+  return $filename;
 }
 
 /**
@@ -270,7 +284,7 @@ function static_generate_files($limit) {
  * old file and create a redirect.
  */
 function static_set_filename(&$info) {
-  $newfile = static_generate_filename($info['alias']);
+  $newfile = static_filename($info);
   // Check to see if a file previously existed but is different.
   if ($info['file'] != '' && $info['file'] != $newfile) {
     // This is a simple html page that redirects to the new page.
