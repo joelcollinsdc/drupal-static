@@ -101,29 +101,6 @@ function static_requirements($phase) {
           );
         }
       }
-      $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
-      if (is_dir($cache_directory) && is_writable($cache_directory) && !is_link($cache_directory . '/' . $wrapper->getDirectoryPath())) {
-        if (!static_create_files_link($cache_directory)) {
-          $requirements['static_files'] = array(
-            'title'       => $t('Static'),
-            'description' => $t('Could not create a link to the files directory.<br /> Attempted to create the link %link but it didn\'t work.', array('%link' => $cache_directory . '/' . file_create_url('public://'))),
-            'severity'    => REQUIREMENT_ERROR,
-            'value'       => $t('Can not write to file-system'),
-          );
-        }
-      }
-      $logo = str_replace($base_url . '/', '', theme_get_setting('logo', variable_get('theme_default', 'bartik')));
-      $favicon = str_replace($base_url . '/', '', theme_get_setting('favicon', variable_get('theme_default', 'bartik')));
-      if (is_dir($cache_directory) && is_writable($cache_directory) && !is_link($cache_directory . '/' . $logo) && !is_link($cache_directory . '/' . $favicon)) {
-        if (!static_create_theme_images($cache_directory, array($logo, $favicon))) {
-          $requirements['static_files'] = array(
-            'title'       => $t('Static'),
-            'description' => $t('Could not create a link to the logo or favicon.<br /> Attempted to create the link %link but it didn\'t work.', array('%link' => $cache_directory . '/' . $logo)),
-            'severity'    => REQUIREMENT_ERROR,
-            'value'       => $t('Can not write to file-system'),
-          );
-        }
-      }
     }
     if (empty($requirements)) {
       $requirements['static'] = array(
@@ -141,36 +118,4 @@ function static_requirements($phase) {
  */
 function static_create_htaccess($cache_directory) {
   return copy(drupal_get_path('module', 'static') . '/htaccess_static', $cache_directory . '/.htaccess');
-}
-
-/**
- * Create a link to the files directory in the cache folder.
- */
-function static_create_files_link($cache_directory) {
-  $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
-  $files_dir = $wrapper->getDirectoryPath();
-    // Create directory if it doesn't exist.
-  $directory = dirname($cache_directory . '/' . $files_dir);
-  if (!static_mkdir($directory)) {
-    return FALSE;
-  }
-  
-  return symlink($wrapper->realpath(), $cache_directory . '/' . $files_dir);
-}
-
-/**
- * Create a link to the files directory in the cache folder.
- */
-function static_create_theme_images($cache_directory, $files) {
-  foreach($files as $file) {
-    $directory = dirname($cache_directory . '/' . $file);
-    if (!static_mkdir($directory)) {
-      return FALSE;
-    }
-    if (!symlink(drupal_realpath($file), $cache_directory . '/' . $file)) {
-      return FALSE;
-    }
-  }
-  
-  return TRUE;
 }

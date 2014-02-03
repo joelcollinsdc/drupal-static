@@ -251,7 +251,10 @@ function static_generate_file($path) {
     // Drupal creates absolute urls for many links. We need to make these relative.
     $data = str_replace($base_url, '', $request[$absolute_url]->data);
     
-    static_write_file(static_get_normal_cache_dir() . '/' . $info['file'], $data);
+    static_copy_linked_files($data);
+    
+    // Set to 755 so ssi can include.
+    static_write_file(static_get_normal_cache_dir() . '/' . $info['file'], $data, 0755);
   }
   
   else {
@@ -260,6 +263,50 @@ function static_generate_file($path) {
   }
 
   watchdog('static', 'Statically generated !file', array('!file' => $info['file']), WATCHDOG_DEBUG);
+}
+
+/**
+ * Find any linked files within the page and copy them over to the destination.
+ * 
+ * @param type $data
+ */
+function static_copy_linked_files($data) {
+  // Should find a way of caching the results so we aren't constantly 
+  // checking common files.
+  $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
+  $files_dir = $wrapper->getDirectoryPath();
+  $srcs = array();
+  preg_match_all('/src="\/([^"]*)"/i', $data, $srcs);
+  $hrefs = array();
+  preg_match_all('/href="\/([^"]*.\.(' . variable_get('static_href_link_types', 'ico|css|pdf|doc') . '))"/i', $data, $hrefs);
+  $matches = array_merge($srcs[1], $hrefs[1]);
+  foreach($matches as $match) {
+    // Strip off the querystring.
+    $cleanfile = preg_replace('/\?.*/', '', $match);
+    // Don't copy if the file already exists.
+    if (!file_exists(static_get_normal_cache_dir() . '/' . $cleanfile)) {
+      // Make sure the destination exists.
+      $directory = dirname(static_get_normal_cache_dir() . '/' . $cleanfile);
+      if (!static_mkdir($directory)) {
+        return FALSE;
+      }
+      // Special case for image styles. We can't directly copy if they haven't
+      // been generated yet.
+      if (strpos($match, $files_dir . '/styles') === 0 && !file_exists(static_get_normal_cache_dir() . '/' . $cleanfile)) {
+        // Should optimize this for multithreaded gets.
+        $absolute_url = urldecode(url($match, array('absolute' => TRUE, 'alias' => TRUE)));
+        httprl_request($absolute_url);
+        $request = httprl_send_request();
+
+        if ($request[$absolute_url]->code == 200) {
+          static_write_file(static_get_normal_cache_dir() . '/' . $cleanfile, $request[$absolute_url]->data, 0644);
+        }
+      }
+      else {
+        copy($cleanfile, static_get_normal_cache_dir() . '/' . $cleanfile);
+      }
+    }
+  }
 }
 
 /**
@@ -321,7 +368,7 @@ function static_set_filename(&$info) {
  * @param $data
  *  data to write to the file.
  */
-function static_write_file($filename, $data) {
+function static_write_file($filename, $data, $chmod = 0644) {
   // Create directory if it doesn't exist.
   $directory = dirname($filename);
   if (!static_mkdir($directory)) {
@@ -334,8 +381,8 @@ function static_write_file($filename, $data) {
     return FALSE;
   }
 
-  // chmod file so webserver can send it out. Set execute so mod_includes will process.
-  drupal_chmod($filename, 0755);
+  // chmod file so webserver can send it out.
+  drupal_chmod($filename, $chmod);
   return TRUE;
 }
 

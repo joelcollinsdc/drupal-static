@@ -6,7 +6,7 @@
 
 /**
  * Have static generate files without .html extension as this is what
- * the esi path is expecting
+ * the esi path is expecting. This works since they aren'te html pages.
  */
 function static_esi_static_filename_alter(&$filename, $info) {
   if (strpos($filename, 'esi/') === 0) {
