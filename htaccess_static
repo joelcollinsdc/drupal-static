@@ -1,0 +1,19 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine on
+  # 301 Redirects domain.com/file.html to domain.com/file.
+  RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s([^.]+)\.html [NC]
+  RewriteRule ^ %1 [R=301,L,NC]
+
+  # Internally redirect domain.com/file to domain.com/file.html.
+  RewriteCond %{REQUEST_FILENAME}\.html -f [NC]
+  RewriteRule ^ %{REQUEST_URI}.html [L]
+
+  # Internal redirect querystring parameters to files.
+  # RewriteRule ^/?test/(.*?)/?$ /test.php?whatever=$1 [L]
+</IfModule>
+
+<IfModule mod_include.c>
+  // Turn on SSI Includes and set executable html to use includes.
+  Options +Includes
+  XBitHack full
+</IfModule>

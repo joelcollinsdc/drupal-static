@@ -1,0 +1,176 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function static_schema() {
+  $schema['static'] = array(
+    'description' => 'The base table for static resources.',
+    'fields' => array(
+      'id' => array(
+        'description' => 'Primary key with type; a unique id for the item.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'path' => array(
+        'description' => 'The URL to the item relative to the Drupal path.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'alias' => array(
+        'description' => 'The alias of the URL.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'file' => array(
+        'description' => 'The file the page was exported to.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'status' => array(
+        'description' => 'An integer that represents if the item is included in the sitemap.',
+        'type' => 'int',
+        'size' => 'small',
+        'not null' => TRUE,
+        'default' => 1,
+      ),
+      'updated' => array(
+        'description' => 'The UNIX timestamp of last generate of the file.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('id', 'path'),
+    'indexes' => array(
+      'path' => array('path'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_requirements().
+ */
+function static_requirements($phase) {
+  global $base_url;
+  $requirements = array();
+  $t = get_t();
+  // Check the server's ability to use static
+  if ($phase == 'runtime') {
+    // Check cache directories
+    $cache_directories = array(
+      static_get_normal_cache_dir(),
+    );
+    foreach ($cache_directories as $cache_directory) {
+      if (static_mkdir($cache_directory)) {
+//         $root_file = file_put_contents($cache_directory . '/' . variable_get('static_root_file', '.static'), $cache_directory);
+      }
+      if (!is_dir($cache_directory)) {
+        $requirements['static_default'] = array(
+          'title'       => $t('Static'),
+          'description' => $t('!cache_dir: does not exist.', array('!cache_dir' => $cache_directory)),
+          'severity'    => REQUIREMENT_ERROR,
+          'value'       => $t('Cache path'),
+        );
+      }
+      if (is_dir($cache_directory) && (!is_writable($cache_directory))) {
+        $requirements['static_permissions'] = array(
+          'title'       => $t('Static'),
+          'description' => $t('Directory %dir credentials - Permissions: %fp. Owner %fo. Group %fg.<br /> Your credentials - Group ID: %gid. User ID: %uid. Current script owner: %user.', array('%dir' => getcwd() . '/' . $cache_directory, '%gid' => getmygid(), '%uid' => getmyuid(), '%user' => get_current_user(), '%fp' => substr(sprintf('%o', fileperms($cache_directory)), -4), '%fo' => fileowner($cache_directory), '%fg' => filegroup($cache_directory) )),
+          'severity'    => REQUIREMENT_ERROR,
+          'value'       => $t('Can not write to file-system'),
+        );
+      }
+      if (is_dir($cache_directory) && is_writable($cache_directory) && !file_exists($cache_directory . '/.htaccess')) {
+        if (!static_create_htaccess($cache_directory)) {
+          $requirements['static_htaccess'] = array(
+            'title'       => $t('Static'),
+            'description' => $t('Could not create .htaccess file.<br /> Attempted to create %file but did not have permission.', array('%file' => $cache_directory . '/.htaccess')),
+            'severity'    => REQUIREMENT_ERROR,
+            'value'       => $t('Can not write to file-system'),
+          );
+        }
+      }
+      $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
+      if (is_dir($cache_directory) && is_writable($cache_directory) && !is_link($cache_directory . '/' . $wrapper->getDirectoryPath())) {
+        if (!static_create_files_link($cache_directory)) {
+          $requirements['static_files'] = array(
+            'title'       => $t('Static'),
+            'description' => $t('Could not create a link to the files directory.<br /> Attempted to create the link %link but it didn\'t work.', array('%link' => $cache_directory . '/' . file_create_url('public://'))),
+            'severity'    => REQUIREMENT_ERROR,
+            'value'       => $t('Can not write to file-system'),
+          );
+        }
+      }
+      $logo = str_replace($base_url . '/', '', theme_get_setting('logo', variable_get('theme_default', 'bartik')));
+      $favicon = str_replace($base_url . '/', '', theme_get_setting('favicon', variable_get('theme_default', 'bartik')));
+      if (is_dir($cache_directory) && is_writable($cache_directory) && !is_link($cache_directory . '/' . $logo) && !is_link($cache_directory . '/' . $favicon)) {
+        if (!static_create_theme_images($cache_directory, array($logo, $favicon))) {
+          $requirements['static_files'] = array(
+            'title'       => $t('Static'),
+            'description' => $t('Could not create a link to the logo or favicon.<br /> Attempted to create the link %link but it didn\'t work.', array('%link' => $cache_directory . '/' . $logo)),
+            'severity'    => REQUIREMENT_ERROR,
+            'value'       => $t('Can not write to file-system'),
+          );
+        }
+      }
+    }
+    if (empty($requirements)) {
+      $requirements['static'] = array(
+        'title'       => $t('Static'),
+        'severity'    => REQUIREMENT_OK,
+        'value'       => $t('Static installed correctly, should be working if properly <a href="@settings">configured</a>.', array('@settings' => url('admin/config/system/static'))),
+      );
+    }
+  }
+  return $requirements;
+}
+
+/**
+ * Create the htaccess file in the cache directory.
+ */
+function static_create_htaccess($cache_directory) {
+  return copy(drupal_get_path('module', 'static') . '/htaccess_static', $cache_directory . '/.htaccess');
+}
+
+/**
+ * Create a link to the files directory in the cache folder.
+ */
+function static_create_files_link($cache_directory) {
+  $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
+  $files_dir = $wrapper->getDirectoryPath();
+    // Create directory if it doesn't exist.
+  $directory = dirname($cache_directory . '/' . $files_dir);
+  if (!static_mkdir($directory)) {
+    return FALSE;
+  }
+  
+  return symlink($wrapper->realpath(), $cache_directory . '/' . $files_dir);
+}
+
+/**
+ * Create a link to the files directory in the cache folder.
+ */
+function static_create_theme_images($cache_directory, $files) {
+  foreach($files as $file) {
+    $directory = dirname($cache_directory . '/' . $file);
+    if (!static_mkdir($directory)) {
+      return FALSE;
+    }
+    if (!symlink(drupal_realpath($file), $cache_directory . '/' . $file)) {
+      return FALSE;
+    }
+  }
+  
+  return TRUE;
+}

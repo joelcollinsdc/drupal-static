@@ -1,0 +1,498 @@
+<?php
+
+/**
+ * @file
+ * Static site generator for Drupal.
+ */
+
+/**
+ * Value for expired content.
+ */
+define('STATIC_EXPIRED', 0);
+
+/**
+ * Value for current content
+ */
+define('STATIC_CURRENT', 1);
+
+/**
+ * Value for error content
+ */
+define('STATIC_ERROR', 2);
+
+/**
+ * Default value for the root cache dir.
+ */
+define('STATIC_ROOT_CACHE_DIR', 'static');
+
+/**
+ * Default value for the normal cache dir.
+ */
+define('STATIC_NORMAL_DIR', 'normal');
+
+/**
+ * Define the default cron limit
+ */
+define('STATIC_DEFAULT_CRON_LIMIT', 30);
+/**
+ * Implements hook_menu().
+ */
+function static_menu() {
+  $items = array();
+
+  $items['admin/config/system/static'] = array(
+    'title' => 'Static Generator',
+    'description' => 'Configuration for the static generator.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('static_admin_settings'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'static.admin.inc',
+  );
+
+  $items['admin/config/system/static/regenerate'] = array(
+    'title' => 'Regenerate',
+    'description' => 'Queue all items for regeneration.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('static_admin_confirm', 4),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'static.admin.inc',
+  );
+
+  $items['admin/config/system/static/clear'] = array(
+    'title' => 'Clear static cache',
+    'description' => 'Clear all the static files for the generator.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('static_admin_confirm', 4),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'static.admin.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Load a static path info
+ */
+function static_get_info($path) {
+  // Ensure this is the normal path.
+  $path = drupal_get_normal_path($path);
+  
+  $path_alias = path_load(array('source' => drupal_get_normal_path($path)));
+  
+  $path_alias['source'] = $path;
+
+  $info = db_select('static', 's')
+    ->fields('s')
+    ->condition('path', $path_alias['source'])
+    ->execute()
+    ->fetchAssoc();
+  
+  // In case this is new.
+  if (!$info) {
+    $info = array(
+      'path' => $path_alias['source'],
+      'alias' => $path_alias['alias'],
+      'status' => STATIC_EXPIRED,
+    );
+  }
+  
+  // Alias may have changed. Record it here.
+  $info['alias'] = $path_alias['alias'];
+  
+  return $info;
+}
+
+/**
+ * Save a static path
+ */
+function static_save_info($info) {
+  $keys = array();
+  if (isset($info['id'])) {
+    $keys[] = 'id';
+  }
+  drupal_write_record('static', $info, $keys);
+}
+
+/**
+ * Generate a filename
+ */
+function static_generate_filename($alias) {
+  // Special case for index.html
+  if ($alias == '') {
+    return 'index.html';
+  }
+  //For now just append .html but will need to handle querystrings later.
+  return $alias . '.html';
+}
+
+/**
+ * Function to set a path to regenerate
+ */
+function static_set_expired($path) {
+  $paths = &drupal_static(__FUNCTION__);
+  
+  $info = static_get_info($path);
+  if (!isset($paths[$info['path']])) {
+
+    // Put URLs in a queue for processing by cron
+    $queue = DrupalQueue::get('static');
+    $queue->createItem($info['path']);
+
+    $info['status'] = STATIC_EXPIRED;
+
+    static_save_info($info);
+    
+    $paths[$info['path']] = TRUE;
+  }
+}
+
+/**
+ * Implements hook_expire_cache (from the 'expire' module)
+ */
+function static_expire_cache($paths) {
+  global $base_root;
+
+  if (variable_get('static_cron', TRUE)) {
+    foreach ($paths as $path => $absolute) {
+      static_set_expired($path);
+    }
+  }
+}
+
+/**
+ * Implements hook_cron_queue_info()
+ */
+function static_cron_queue_info() {
+  $queues['static'] = array(
+    'worker callback' => 'static_generate_file',
+    'time' => variable_get('static_queue_seconds', 30), // max run time to claim per cron run (in seconds).
+  );
+
+  return $queues;
+}
+
+/**
+ * Worker Callback for the static cron queue.
+ */
+function static_generate_file($path) {
+  global $base_url;
+  $info = static_get_info($path);
+  $absolute_url = url($info['alias'], array('absolute' => TRUE, 'alias' => TRUE));
+  
+  httprl_request($absolute_url);
+  $request = httprl_send_request();
+  
+  if ($request[$absolute_url]->code == 200) {
+    static_set_filename($info);
+    $info['status'] = STATIC_CURRENT;
+    $info['updated'] = REQUEST_TIME;
+    
+    static_save_info($info);
+    
+    // Drupal creates absolute urls for many links. We need to make these relative.
+    $data = str_replace($base_url, '', $request[$absolute_url]->data);
+    
+    static_write_file(static_get_normal_cache_dir() . '/' . $info['file'], $data);
+  }
+  
+  else {
+    $info['status'] = STATIC_ERROR;
+    static_save_info($info);
+  }
+
+  watchdog('static', 'Statically generated !file', array('!file' => $info['file']), WATCHDOG_DEBUG);
+}
+
+/**
+ * Callback to generate multiple files based on files with status=0
+ */
+function static_generate_files($limit) {
+  $results = db_select('static', 's')
+      ->fields('s')
+      ->condition('status', STATIC_EXPIRED)
+      ->range(0, $limit)
+      ->execute()
+      ->fetchAllAssoc('id');
+  
+  foreach($results as $id => $result) {
+    static_generate_file($result->path);
+  }
+}
+
+/**
+ * Set the filename if needed. If it already exists but is different, delete the
+ * old file and create a redirect.
+ */
+function static_set_filename(&$info) {
+  $newfile = static_generate_filename($info['alias']);
+  // Check to see if a file previously existed but is different.
+  if ($info['file'] != '' && $info['file'] != $newfile) {
+    // This is a simple html page that redirects to the new page.
+    $data = '<html>' . PHP_EOL
+        . '  <head>' . PHP_EOL
+        . '    <meta http-equiv="refresh" content="0;URL=/' . $newfile . '">' . PHP_EOL
+        . '  </head>' . PHP_EOL
+        . '  <body>' . PHP_EOL
+        . '    <a href="/' . $newfile . '">Page has moved to this location.</a>' . PHP_EOL
+        . '  </body>' . PHP_EOL
+        . '</html>' . PHP_EOL;
+    
+    // Create directory if it doesn't exist.
+    $directory = dirname(static_get_normal_cache_dir() . '/' . $info['file']);
+    if (!static_mkdir($directory)) {
+      return FALSE;
+    }
+    // Save the redirect to the system.
+    if (file_put_contents(static_get_normal_cache_dir() . '/' . $info['file'], $data) === FALSE) {
+      watchdog('static', 'Could not create the file %file on your system', array('%file' => $filename), WATCHDOG_ERROR);
+      return FALSE;
+    }
+    
+  }
+  
+  $info['file'] = $newfile;
+}
+
+/**
+ * Write to a file. Ensures write is atomic via rename operation.
+ *
+ * @param $filename
+ *  relative filename.
+ * @param $data
+ *  data to write to the file.
+ */
+function static_write_file($filename, $data) {
+  // Create directory if it doesn't exist.
+  $directory = dirname($filename);
+  if (!static_mkdir($directory)) {
+    return FALSE;
+  }
+
+  // Save the file to the system.
+  if (file_put_contents($filename, $data) === FALSE) {
+    watchdog('static', 'Could not create the file %file on your system', array('%file' => $filename), WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  // chmod file so webserver can send it out.
+  drupal_chmod($filename);
+  return TRUE;
+}
+
+/**
+ * Create a directory.
+ *
+ * @param $directory
+ *  relative directory.
+ */
+function static_mkdir($directory) {
+  global $_static;
+
+  // Only do something if it's not a dir.
+  if (!is_dir($directory)) {
+    if (!static_in_cache_dir($directory)) {
+      return FALSE;
+    }
+
+    // Try to create the directory.
+    $mode = variable_get('file_chmod_directory', 0775);
+    if (!mkdir($directory, $mode, TRUE)) {
+      watchdog('static', 'Could not create the directory %dir on your system', array('%dir' => $directory), WATCHDOG_ERROR);
+      return FALSE;
+    }
+    drupal_chmod($directory);
+  }
+  return TRUE;
+}
+
+/**
+ * Returns the relative normal static dir. static/normal.
+ */
+function static_get_normal_cache_dir() {
+  return variable_get('static_root_cache_dir', STATIC_ROOT_CACHE_DIR) . '/' . variable_get('static_normal_dir', STATIC_NORMAL_DIR);
+}
+
+/**
+ * Verify that the operation is going to operate in the cache dir.
+ *
+ * @param $file
+ *  relative directory or file.
+ */
+function static_in_cache_dir($file) {
+  global $_static;
+
+  $good = TRUE;
+  $real_file = realpath($file);
+  $cache_dir = variable_get('static_root_cache_dir', STATIC_ROOT_CACHE_DIR);
+  $real_cache_dir = realpath($cache_dir);
+
+  // Only operate in the cache dir.
+  // Check the real path.
+  if (   strpos($file, $cache_dir) !== 0
+      || ($real_file && $real_cache_dir && strpos($real_file, $real_cache_dir) !== 0)
+        ) {
+    $good = FALSE;
+  }
+
+  // Send error to watchdog.
+  if (!$good) {
+    watchdog('static', 'An operation outside of the cache directory was attempted on your system. %file or %real_file is outside the cache directory %cache or %real_cache. Debug info below <br> !debug', array(
+      '%file'       => $file,
+      '%real_file'  => $real_file,
+      '%cache'      => $cache_dir,
+      '%real_cache' => $real_cache_dir,
+      '!debug'      => print_r($_static),
+      ),
+    WATCHDOG_CRITICAL);
+  }
+
+  return $good;
+}
+
+/**
+ * Set all pages to be regenerated
+ */
+function static_regenerate() {
+  db_update('static')
+    ->fields(array(
+      'status' => 0,
+    ))
+    ->execute();
+  
+  return TRUE;
+}
+
+/**
+ * Clear out all static pages.
+ */
+function static_clear() {
+  static_regenerate();
+  
+  //$static_delete_dir = drupal_realpath(static_get_normal_cache_dir());
+  static_delete_dir(drupal_realpath(static_get_normal_cache_dir()));
+  
+  // Call the requirements to make sure all the links gets linked again.
+  include_once drupal_get_path('module', 'static') . '/static.install';
+  static_requirements('runtime');
+
+  return TRUE;
+}
+
+/**
+ * function to delete directory and everything under it.
+ */
+function static_delete_dir($dir) {
+  $files = array_diff(scandir($dir), array('.','..')); 
+  foreach ($files as $file) { 
+    if (is_link("$dir/$file") || is_file("$dir/$file")) {
+      drupal_unlink("$dir/$file");
+    }
+    elseif (is_dir("$dir/$file")) {
+      static_delete_dir("$dir/$file");
+    }
+  } 
+  return drupal_rmdir($dir); 
+}
+
+/**
+ * Creates and sets a batch for generating items.
+ *
+ * @param int $batch_size
+ *   Number of items to index per batch.
+ *
+ * @return bool
+ *   Whether the batch was created and set successfully.
+ */
+function _static_batch_generating_create($batch_size) {
+  $limit = -1;
+  $remaining = $batch_size;
+  if ($limit !== 0 && $batch_size !== 0) {
+    if ($limit < 0 || $limit > $remaining) {
+      $limit = $remaining;
+    }
+    if ($batch_size < 0) {
+      $batch_size = $remaining;
+    }
+    $batch = array(
+      'title' => t('Generating pages'),
+      'operations' => array(
+        array('_static_batch_generating_callback', array($batch_size)),
+      ),
+      'progress_message' => t('Completed about @percentage% of the generating operation.'),
+      'finished' => '_static_batch_generating_finished',
+      'file' => drupal_get_path('module', 'static') . '/static.module',
+    );
+    batch_set($batch);
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Batch API callback for the generating functionality.
+ *
+ * @param integer $batch_size
+ *   Number of items to index per batch.
+ * @param $context
+ *   An array (or object implementing ArrayAccess) containing the batch context.
+ */
+function _static_batch_generating_callback($batch_size, &$context) {
+  // Persistent data among batch runs.
+  if (!isset($context['sandbox']['batch_size'])) {
+    $query = db_select('static', 's');
+    $query->fields('s');
+    $query->condition('status', STATIC_EXPIRED);
+    $result = $query->execute();
+    $context['sandbox']['limit'] = $result->rowCount();
+
+    $context['sandbox']['batch_size'] = $batch_size;
+    $context['sandbox']['progress'] = 0;
+  }
+
+  // Persistent data for results.
+  if (!isset($context['results']['generated'])) {
+    $context['results']['generated'] = 0;
+    $context['results']['not generated'] = 0;
+  }
+
+  // Number of items to index for this run.
+  $to_index = min($context['sandbox']['limit'] - $context['sandbox']['progress'], $context['sandbox']['batch_size']);
+
+  // Index the items.
+  try {
+    $indexed = static_generate_files($to_index);
+    $context['results']['indexed'] += $indexed;
+  }
+  catch (SearchApiException $e) {
+    watchdog_exception('search_api', $e);
+    $vars['@message'] = $e->getMessage();
+    $context['message'] = t('An error occurred during indexing: @message.', $vars);
+    $context['finished'] = 1;
+    $context['results']['not indexed'] += $context['sandbox']['limit'] - $context['sandbox']['progress'];
+    return;
+  }
+
+  // Display progress message.
+  if ($indexed > 0) {
+    $format_plural = $context['results']['drush'] === TRUE ? '_search_api_drush_format_plural' : 'format_plural';
+    $context['message'] = $format_plural($context['results']['indexed'], 'Successfully indexed 1 item.', 'Successfully indexed @count items.');
+  }
+
+  // Some items couldn't be indexed.
+  if ($indexed !== $to_index) {
+    $context['results']['not indexed'] += $to_index - $indexed;
+  }
+
+  $context['sandbox']['progress'] += $to_index;
+
+  // Everything has been indexed.
+  if ($indexed === 0 || $context['sandbox']['progress'] >= $context['sandbox']['limit']) {
+    $context['finished'] = 1;
+  }
+  else {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['limit'];
+  }
+}

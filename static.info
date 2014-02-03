@@ -1,0 +1,8 @@
+name = Static Generator
+description = Generates a static version of the site.
+package = Performance and scalability
+core = 7.x
+
+recommends[] = expire
+dependencies[] = httprl
+
