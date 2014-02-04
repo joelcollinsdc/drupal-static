@@ -25,7 +25,14 @@ function static_esi_esi_block_url_alter(&$url) {
   unset($parts[4]);
   unset($parts[5]);
   $url = implode('/', $parts);
-  static_track_paths(array($url));
+  static_track_paths(
+    array(
+      array(
+        'type' => 'esi',
+        'path' => $url, 
+      )
+    )
+  );
 }
 
 /**
@@ -39,7 +46,14 @@ function static_esi_esi_context_url_alter($url) {
   unset($parts[4]);
   unset($parts[5]);
   $url = implode('/', $parts);
-  static_track_paths(array($url));
+  static_track_paths(
+    array(
+      array(
+        'type' => 'esi',
+        'path' => $url, 
+      )
+    )
+  );
 }
 
 /**

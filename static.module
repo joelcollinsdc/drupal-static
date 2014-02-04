@@ -49,10 +49,19 @@ function static_track_paths($paths) {
 /**
  * Track a single path.
  * 
+ * @param type $path can either be a string which represents the path or an
+ * info array.
+ * 
  * For multiple paths, use static_track_paths
  */
 function static_track_path($path) {
-  $info = static_get_info($path);
+  if (is_array($path)) {
+    $info = static_get_info($path['path']);
+    $info = $path + $info; // Merge the arrays.
+  }
+  else {
+    $info = static_get_info($path);
+  }
   // Only process new paths
   if (!isset($info['id'])) {
     // Put URLs in a queue for processing by cron
@@ -258,6 +267,10 @@ function static_generate_file($path) {
   }
   
   else {
+    // This can happen if something is deleted. We want to remove the corresponding file.
+    if ($request[$absolute_url]->code == 404 && $info['file']) {
+      @unlink(static_get_normal_cache_dir() . '/' . $info['file']);
+    }
     $info['status'] = STATIC_ERROR;
     static_save_info($info);
   }
@@ -611,7 +624,43 @@ function _static_batch_generating_callback($batch_size, &$context) {
 function static_refresh_paths() {
   // On larger sites this might run into php limit issues (memory and time).
   $paths = module_invoke_all('static_refresh_paths');
+  
+  drupal_alter('static_refresh_paths', $paths);
+  
   static_track_paths($paths);
+}
+
+/**
+ * Implements hook_static_refresh_paths()
+ * 
+ * Return info about system paths.
+ */
+function static_static_refresh_paths() {
+  $paths = array();
+  $paths['<front>'] = array(
+    'type' => 'system',
+    'path' => '<front>',
+  );
+  $paths['node'] = array(
+    'type' => 'system',
+    'path' => 'node',
+    'pager' => 'page',
+  );
+  $site_404 = variable_get('site_404', '');
+  if ($site_404 != '') {
+    $paths[$site_404] = array(
+      'type' => 'system',
+      'path' => $site_404,
+    );
+  }
+  $site_403 = variable_get('site_403', '');
+  if ($site_403 != '') {
+    $paths[$site_403] = array(
+      'type' => 'system',
+      'path' => $site_403,
+    );
+  }
+  return $paths;
 }
 
 /**
