@@ -9,5 +9,16 @@
  * Refresh all paths for the static module.
  */
 function static_views_static_refresh_paths() {
-  return array();
+  $paths = array();
+  $views = views_get_all_views();
+  foreach($views as $view) {
+    if (!$view->disabled) {
+      foreach($view->display as $id => $display) {
+        if ($display->display_plugin == 'page' && strpos($display->display_options['path'], '%') === FALSE) {
+          $paths[$display->display_options['path']] = $display->display_options['path'];
+        }
+      }
+    }
+  }
+  return $paths;
 }
