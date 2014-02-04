@@ -35,10 +35,13 @@ Options -Indexes
   RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s([^.]+)\.html [NC]
   RewriteRule ^ %1 [R=301,L,NC]
 
-  # Internally redirect domain.com/file to domain.com/file.html.
-  RewriteCond %{REQUEST_FILENAME}\.html -f
-  RewriteRule ^ %{REQUEST_URI}.html [L]
-
   # Internal redirect querystring parameters to files.
-  # RewriteRule ^/?test/(.*?)/?$ /test.php?whatever=$1 [L]
+  # domain.com/node?page=1 to domain.com node_page=1.html
+  RewriteCond %{REQUEST_FILENAME}_%{QUERY_STRING}\.html -s
+  RewriteRule ^ %{REQUEST_URI}_%{QUERY_STRING}\.html [L]
+
+  # Internally redirect paths to their html equivalents.
+  # domain.com/file to domain.com/file.html.
+  RewriteCond %{REQUEST_FILENAME}\.html -s
+  RewriteRule ^ %{REQUEST_URI}.html [L]
 </IfModule>
