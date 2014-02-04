@@ -1,0 +1,8 @@
+name = Static Views
+description = Discover views pages and blocks for the static module.
+package = Performance and scalability
+core = 7.x
+
+dependencies[] = static
+dependencies[] = views
+

@@ -55,6 +55,12 @@ function static_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'pager_total' => array(
+        'description' => 'The total number of pages for this page.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+      ),
       'updated' => array(
         'description' => 'The UNIX timestamp of last generate of the file.',
         'type' => 'int',
