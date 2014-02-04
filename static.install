@@ -13,13 +13,6 @@ function static_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
       ),
-      'type' => array(
-        'description' => 'The type of page this is. i.e. what module or system created it.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
       'path' => array(
         'description' => 'The URL to the item relative to the Drupal path.',
         'type' => 'varchar',
@@ -47,6 +40,13 @@ function static_schema() {
         'size' => 'small',
         'not null' => TRUE,
         'default' => 1,
+      ),
+      'dynamic' => array(
+        'description' => 'Whether this page contains dynamic content. This is used to determine if this should be regenerated on a schedule (cron).',
+        'type' => 'int',
+        'size' => 'small',
+        'not null' => TRUE,
+        'default' => 0,
       ),
       'pager' => array(
         'description' => 'If this url allows paging, set the querystring for paging here.',

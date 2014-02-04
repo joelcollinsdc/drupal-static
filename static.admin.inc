@@ -17,16 +17,38 @@ function static_admin_settings() {
     '#title' => t('Root cache directory'),
     '#default_value' => variable_get('static_root_cache_dir', STATIC_ROOT_CACHE_DIR),
   );
+
   $form['static_normal_dir'] = array(
     '#type' => 'textfield',
     '#title' => t('Normal cache directory'),
     '#default_value' => variable_get('static_normal_dir', STATIC_NORMAL_DIR),
   );
+
   $form['static_cron'] = array(
     '#type' => 'checkbox',
     '#title' => t('Enable the cron static generator'),
     '#default_value' => variable_get('static_cron', TRUE),
     '#description'   => t("Use cron to generate static pages on the site."),
+  );
+
+  $form['static_dynamic_cache_time'] = array(
+    '#type' => 'select',
+    '#title' => t('Dynamic Cache Refresh'),
+    '#default_value' => variable_get('static_dynamic_cache_time', 300),
+    '#options' => array(
+      0 => 'always',
+      60 => '1 minute',
+      300 => '5 minutes',
+      600 => '10 minutes',
+      1800 => '30 minutes',
+      3600 => '1 hour',
+      7200 => '2 hours',
+      18000 => '5 hours',
+      43200 => '12 hours',
+      86400 => '1 day',
+      -1 => 'never',
+    ),
+    '#description'   => t("Set how often dynamic pages should be regenerated with cron."),
   );
 
   $form['static_queue_seconds'] = array(

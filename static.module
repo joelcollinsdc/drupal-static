@@ -64,9 +64,6 @@ function static_track_path($path) {
   }
   // Only process new paths
   if (!isset($info['id'])) {
-    // Put URLs in a queue for processing by cron
-    $queue = DrupalQueue::get('static');
-    $queue->createItem($info['path']);
     static_save_info($info);
   }
 }
@@ -201,11 +198,6 @@ function static_set_expired($path) {
   
   $info = static_get_info($path);
   if (!isset($paths[$info['path']])) {
-
-    // Put URLs in a queue for processing by cron
-    $queue = DrupalQueue::get('static');
-    $queue->createItem($info['path']);
-
     $info['status'] = STATIC_EXPIRED;
 
     static_save_info($info);
@@ -228,6 +220,35 @@ function static_expire_cache($paths) {
 }
 
 /**
+ * Implements hook_cron()
+ */
+function static_cron() {
+  if (variable_get('static_cron', TRUE)) {
+    $cache_time = variable_get('static_dynamic_cache_time', 300);
+    if ($cache_time >= 0) { // In case set to "never"
+      db_update('static')
+        ->fields(array(
+          'status' => 0
+        ))
+        ->condition('dynamic', 1)
+        ->condition('updated', REQUEST_TIME - $cache_time, '<=')
+        ->execute();
+    }
+    
+    $results = db_select('static', 's')
+      ->fields('s', array('path'))
+      ->condition('status', 0)
+      ->execute()
+      ->fetchAllKeyed(0,0);
+    foreach($results as $path) {
+      // Put URLs in a queue for processing by cron
+      $queue = DrupalQueue::get('static');
+      $queue->createItem($path);
+    }
+  }
+}
+
+/**
  * Implements hook_cron_queue_info()
  */
 function static_cron_queue_info() {
@@ -240,11 +261,16 @@ function static_cron_queue_info() {
 }
 
 /**
- * Worker Callback for the static cron queue.
+ * Worker Callback for batches.
  */
 function static_generate_file($path) {
   global $base_url;
   $info = static_get_info($path);
+  // If status is 1, we don't want to regenerate again. Only regenerated status 0
+  // This can happen when items get left in the queue and are there for multiple runs.
+  if ($info['status']) {
+    return TRUE;
+  }
   $absolute_url = url($info['alias'], array('absolute' => TRUE, 'alias' => TRUE));
   
   httprl_request($absolute_url);
@@ -637,14 +663,14 @@ function static_refresh_paths() {
  */
 function static_static_refresh_paths() {
   $paths = array();
-  $paths['<front>'] = array(
-    'type' => 'system',
+  $paths[''] = array(
     'path' => '<front>',
+    'dynamic' => 1,
   );
   $paths['node'] = array(
-    'type' => 'system',
     'path' => 'node',
     'pager' => 'page',
+    'dynamic' => 1,
   );
   $site_404 = variable_get('site_404', '');
   if ($site_404 != '') {

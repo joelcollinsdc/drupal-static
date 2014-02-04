@@ -28,8 +28,8 @@ function static_esi_esi_block_url_alter(&$url) {
   static_track_paths(
     array(
       array(
-        'type' => 'esi',
         'path' => $url, 
+        'dynamic' => 1,
       )
     )
   );
@@ -49,8 +49,8 @@ function static_esi_esi_context_url_alter($url) {
   static_track_paths(
     array(
       array(
-        'type' => 'esi',
         'path' => $url, 
+        'dynamic' => 1,
       )
     )
   );
