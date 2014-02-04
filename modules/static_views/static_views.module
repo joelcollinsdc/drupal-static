@@ -15,7 +15,10 @@ function static_views_static_refresh_paths() {
     if (!$view->disabled) {
       foreach($view->display as $id => $display) {
         if ($display->display_plugin == 'page' && strpos($display->display_options['path'], '%') === FALSE) {
-          $paths[$display->display_options['path']] = $display->display_options['path'];
+          $paths[$display->display_options['path']] = array(
+            'path' => $display->display_options['path'],
+            'dynamic' => 1,
+          );
         }
       }
     }
