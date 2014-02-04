@@ -688,35 +688,3 @@ function static_static_refresh_paths() {
   }
   return $paths;
 }
-
-/**
- * This should probably be a patch to the esi module.
- * 
- * Note: In apache 2.x the include directive does not have a space between the
- * html comment and the include directive. This is different than apache 1.x
- * 
- * See: http://forums.cpanel.net/f5/ssi-problem-apache-2-a-131809.html
- * 
- * Apache 1.x <!--# include virtual="
- * Apache 2.x <!--#include virtual="
- * 
- */
-
-/**
- * Implements hook_esi_mode().
- */
-function static_esi_mode() {
-  return array(
-    'ssi_apache2' => array(
-      'title' => 'SSI tag (Apache 2)',
-      'render' => 'static_esi_ssi_apache2_tag',
-    ),
-  );
-}
-
-/**
- * Generate an ssi tag for apache2
- */
-function static_esi_ssi_apache2_tag($url) {
-  return '<!--#include virtual="' . $url . '" -->';
-}
