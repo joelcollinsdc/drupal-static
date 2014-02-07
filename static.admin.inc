@@ -246,6 +246,32 @@ function static_admin_confirm_submit(array $form, array &$form_state) {
  * Page callback for static status
  */
 function static_admin_paths() {
+  // Form to add a path to tracking.
+  $form['new'] = array(
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+    '#attributes' => array('class' => array('exposed-filters')),
+    '#title' => 'Add a path',
+    '#tree' => TRUE
+  );
+  
+  $form['new']['path'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Path',
+  );
+
+  $form['new']['dynamic'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Dymamic',
+    '#description' => 'Check this box if the page has a list of content that should be updated regularly by cron such as a view page.',
+  );
+  
+  $form['new']['add'] = array(
+    '#type' => 'submit',
+    '#value' => t('Add'),
+  );
+  
   $session = isset($_SESSION['static_path_filter']) ? $_SESSION['static_path_filter'] : array();
   
   $session += array(
@@ -436,6 +462,9 @@ function static_admin_paths_submit($form, &$form_state) {
       break;
     case t('Reset'):
       $_SESSION['static_path_filter'] = array();
+      break;
+    case t('Add'):
+      static_track_path($form_state['values']['new']);
       break;
   }
 }
