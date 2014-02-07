@@ -337,10 +337,10 @@ function static_admin_paths() {
     '#title' => t('Update options'),
     '#attributes' => array('class' => array('container-inline')),
   );
-  $options = array();
-  foreach (module_invoke_all('node_operations') as $operation => $array) {
-    $options[$operation] = $array['label'];
-  }
+  $options = array(
+    'regenerate_paths' => 'Regenerate Paths',
+    'delete_paths' => 'Delete Paths',
+  );
   $form['options']['operation'] = array(
     '#type' => 'select',
     '#title' => t('Operation'),
@@ -351,8 +351,6 @@ function static_admin_paths() {
   $form['options']['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Update'),
-    '#validate' => array('node_admin_nodes_validate'),
-    '#submit' => array('node_admin_nodes_submit'),
   );
 
   // Build the sortable table header.
@@ -360,10 +358,10 @@ function static_admin_paths() {
     'path' => array('data' => t('Path'), 'field' => 's.path'),
     'alias' => array('data' => t('Alias'), 'field' => 's.alias'),
     'file' => array('data' => t('Generated File'), 'field' => 's.file'),
+    'dynamic' => array('data' => t('Dynamic Page'), 'field' => 's.dynamic'),
     'status' => array('data' => t('Status'), 'field' => 's.status'),
     'updated' => array('data' => t('Updated'), 'field' => 's.updated', 'sort' => 'desc')
   );
-  $header['operations'] = array('data' => t('Operations'));
 
   $query = db_select('static', 's')
       ->extend('PagerDefault')
@@ -396,48 +394,10 @@ function static_admin_paths() {
       'path' => check_plain($info->path),
       'alias' => check_plain($info->alias),
       'file' => check_plain($info->file),
+      'dynamic' => ($info->dynamic?'Yes':'No'),
       'status' => ($info->status ? ($info->status == 2 ? t('error') : t('current')) : t('needs generation')),
       'updated' => format_date($info->updated, 'short'),
     );
-    // Build a list of all the accessible operations for the current node.
-    $operations = array();
-//    if (node_access('update', $node)) {
-//      $operations['edit'] = array(
-//        'title' => t('edit'),
-//        'href' => 'node/' . $node->nid . '/edit',
-//        'query' => $destination,
-//      );
-//    }
-//    if (node_access('delete', $node)) {
-//      $operations['delete'] = array(
-//        'title' => t('delete'),
-//        'href' => 'node/' . $node->nid . '/delete',
-//        'query' => $destination,
-//      );
-//    }
-    $options[$info->id]['operations'] = array();
-    if (count($operations) > 1) {
-      // Render an unordered list of operations links.
-      $options[$info->id]['operations'] = array(
-        'data' => array(
-          '#theme' => 'links__node_operations',
-          '#links' => $operations,
-          '#attributes' => array('class' => array('links', 'inline')),
-        ),
-      );
-    }
-    elseif (!empty($operations)) {
-      // Render the first and only operation as a link.
-      $link = reset($operations);
-      $options[$info->id]['operations'] = array(
-        'data' => array(
-          '#type' => 'link',
-          '#title' => $link['title'],
-          '#href' => $link['href'],
-          '#options' => array('query' => $link['query']),
-        ),
-      );
-    }
   }
 
   $form['items'] = array(
@@ -465,6 +425,23 @@ function static_admin_paths_submit($form, &$form_state) {
       break;
     case t('Add'):
       static_track_path($form_state['values']['new']);
+      break;
+    case t('Update'):
+      switch($form_state['values']['operation']) {
+        case 'regenerate_paths':
+          db_update('static')
+            ->fields(array('status' => 0))
+            ->condition('id', $form_state['values']['items'], 'IN')
+            ->execute();
+          break;
+        case 'delete_paths':
+          // Need to add a confirm form here as well as instructions that it
+          // doesn't delete the generated files as well yet.
+          db_delete('static')
+            ->condition('id', $form_state['values']['items'], 'IN')
+            ->execute();
+          break;
+      }
       break;
   }
 }
