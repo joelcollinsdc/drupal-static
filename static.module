@@ -108,7 +108,7 @@ function static_menu() {
     'page arguments' => array('static_admin_settings'),
     'access arguments' => array('administer static site'),
     'type' => MENU_LOCAL_TASK,
-    'weight' => -5,
+    'weight' => 5,
     'file' => 'static.admin.inc',
   );
 

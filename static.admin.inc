@@ -246,12 +246,70 @@ function static_admin_confirm_submit(array $form, array &$form_state) {
  * Page callback for static status
  */
 function static_admin_paths() {
+  $session = isset($_SESSION['static_path_filter']) ? $_SESSION['static_path_filter'] : array();
+  
+  $session += array(
+    'status' => '',
+    'path' => '',
+    'alias' => '',
+  );
+
+  $form['filters'] = array(
+    '#type' => 'fieldset',
+    '#attributes' => array('class' => array('exposed-filters')),
+    '#title' => t('Show only items where'),
+  );
+  
+  $form['filters']['filters'] = array(
+    '#type' => 'container',
+    '#tree' => TRUE,
+    '#attributes' => array('class' => array('filters')),
+  );
+
+  $form['filters']['filters']['status'] = array(
+    '#type' => 'select',
+    '#title' => 'status',
+    '#options' => array(
+      '' => 'any',
+      STATIC_CURRENT => 'current',
+      STATIC_EXPIRED => 'needs generation',
+      STATIC_ERROR => 'error',
+    ),
+    '#default_value' => $session['status'],
+  );
+  
+  $form['filters']['filters']['path'] = array(
+    '#type' => 'textfield',
+    '#title' => 'path',
+    '#size' => 30,
+    '#default_value' => $session['path'],
+  );
+
+  $form['filters']['filters']['alias'] = array(
+    '#type' => 'textfield',
+    '#title' => 'alias',
+    '#size' => 30,
+    '#default_value' => $session['alias'],
+  );
+
+  $form['filters']['actions'] = array(
+    '#type' => 'actions',
+    '#attributes' => array('class' => array('container-inline')),
+  );
+  $form['filters']['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => count(array_filter($session)) ? t('Refine') : t('Filter'),
+  );
+  if (count(array_filter($session))) {
+    $form['filters']['status']['actions']['undo'] = array('#type' => 'submit', '#value' => t('Undo'));
+    $form['filters']['status']['actions']['reset'] = array('#type' => 'submit', '#value' => t('Reset'));
+  }
+
   // Build the 'Update options' form.
   $form['options'] = array(
     '#type' => 'fieldset',
     '#title' => t('Update options'),
     '#attributes' => array('class' => array('container-inline')),
-    '#access' => $admin_access,
   );
   $options = array();
   foreach (module_invoke_all('node_operations') as $operation => $array) {
@@ -285,15 +343,17 @@ function static_admin_paths() {
       ->extend('PagerDefault')
       ->extend('TableSort')
       ->fields('s');
-  $filter_data = isset($_SESSION['node_overview_filter']) ? $_SESSION['node_overview_filter'] : array();
-  foreach ($filter_data as $index => $filter) {
-    list($key, $value) = $filter;
-    switch ($key) {
+  $options = array();
+  foreach ($session as $index => $filter) {
+    if ($filter == '') {
+      continue;
+    }
+    switch ($index) {
       case 'status':
-        $query->condition('s.' . $key, $value);
+        $query->condition('s.' . $index, $filter);
       case 'path':
       case 'alias':
-        $query->condition('s.' . $key, '%' . $value . '%', 'LIKE');
+        $query->condition('s.' . $index, '%' . $filter . '%', 'LIKE');
         break;
     }
   }
@@ -310,11 +370,11 @@ function static_admin_paths() {
       'path' => check_plain($info->path),
       'alias' => check_plain($info->alias),
       'file' => check_plain($info->file),
-      'status' => ($info->status ? ($info->status == 2 ? t('error') : t('current')) : t('need generation')),
+      'status' => ($info->status ? ($info->status == 2 ? t('error') : t('current')) : t('needs generation')),
       'updated' => format_date($info->updated, 'short'),
     );
     // Build a list of all the accessible operations for the current node.
-//    $operations = array();
+    $operations = array();
 //    if (node_access('update', $node)) {
 //      $operations['edit'] = array(
 //        'title' => t('edit'),
@@ -329,51 +389,53 @@ function static_admin_paths() {
 //        'query' => $destination,
 //      );
 //    }
-//    $options[$node->nid]['operations'] = array();
-//    if (count($operations) > 1) {
-//      // Render an unordered list of operations links.
-//      $options[$node->nid]['operations'] = array(
-//        'data' => array(
-//          '#theme' => 'links__node_operations',
-//          '#links' => $operations,
-//          '#attributes' => array('class' => array('links', 'inline')),
-//        ),
-//      );
-//    }
-//    elseif (!empty($operations)) {
-//      // Render the first and only operation as a link.
-//      $link = reset($operations);
-//      $options[$node->nid]['operations'] = array(
-//        'data' => array(
-//          '#type' => 'link',
-//          '#title' => $link['title'],
-//          '#href' => $link['href'],
-//          '#options' => array('query' => $link['query']),
-//        ),
-//      );
-//    }
+    $options[$info->id]['operations'] = array();
+    if (count($operations) > 1) {
+      // Render an unordered list of operations links.
+      $options[$info->id]['operations'] = array(
+        'data' => array(
+          '#theme' => 'links__node_operations',
+          '#links' => $operations,
+          '#attributes' => array('class' => array('links', 'inline')),
+        ),
+      );
+    }
+    elseif (!empty($operations)) {
+      // Render the first and only operation as a link.
+      $link = reset($operations);
+      $options[$info->id]['operations'] = array(
+        'data' => array(
+          '#type' => 'link',
+          '#title' => $link['title'],
+          '#href' => $link['href'],
+          '#options' => array('query' => $link['query']),
+        ),
+      );
+    }
   }
 
-  // Only use a tableselect when the current user is able to perform any
-  // operations.
-  if ($admin_access) {
-    $form['nodes'] = array(
-      '#type' => 'tableselect',
-      '#header' => $header,
-      '#options' => $options,
-      '#empty' => t('No content available.'),
-    );
-  }
-  // Otherwise, use a simple table.
-  else {
-    $form['nodes'] = array(
-      '#theme' => 'table',
-      '#header' => $header,
-      '#rows' => $options,
-      '#empty' => t('No content available.'),
-    );
-  }
+  $form['items'] = array(
+    '#type' => 'tableselect',
+    '#header' => $header,
+    '#options' => $options,
+    '#empty' => t('No content available.'),
+  );
 
   $form['pager'] = array('#markup' => theme('pager'));
   return $form;
+}
+
+/**
+ * Submit handler for static_admin_paths()
+ */
+function static_admin_paths_submit($form, &$form_state) {
+  switch ($form_state['values']['op']) {
+    case t('Filter'):
+    case t('Refine'):
+      $_SESSION['static_path_filter'] = $form_state['values']['filters'];
+      break;
+    case t('Reset'):
+      $_SESSION['static_path_filter'] = array();
+      break;
+  }
 }
