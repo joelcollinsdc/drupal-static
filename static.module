@@ -69,6 +69,18 @@ function static_track_path($path) {
 }
 
 /**
+ * Implements hook_permission
+ */
+function static_permission() {
+  return array(
+    'administer static site' => array(
+      'title' => t('Administer static site'),
+      'description' => t('Perform administration tasks on the static built site.'),
+    ),
+  );  
+}
+
+/**
  * Implements hook_menu().
  */
 function static_menu() {
@@ -76,11 +88,37 @@ function static_menu() {
 
   $items['admin/config/system/static'] = array(
     'title' => 'Static Generator',
+    'description' => 'The current status of the Static build.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('static_admin_status'),
+    'access arguments' => array('administer static site'),
+    'file' => 'static.admin.inc',
+  );
+
+  $items['admin/config/system/static/status'] = array(
+    'title' => 'Status',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  $items['admin/config/system/static/settings'] = array(
+    'title' => 'Settings',
     'description' => 'Configuration for the static generator.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('static_admin_settings'),
-    'access arguments' => array('administer site configuration'),
-    'type' => MENU_NORMAL_ITEM,
+    'access arguments' => array('administer static site'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => -5,
+    'file' => 'static.admin.inc',
+  );
+
+  $items['admin/config/system/static/paths'] = array(
+    'title' => 'Paths',
+    'description' => 'List of the paths currently being tracked by the static module.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('static_admin_paths'),
+    'access arguments' => array('administer static site'),
+    'type' => MENU_LOCAL_TASK,
     'file' => 'static.admin.inc',
   );
 
@@ -89,8 +127,8 @@ function static_menu() {
     'description' => 'Queue all items for regeneration.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('static_admin_confirm', 4),
-    'access arguments' => array('administer site configuration'),
-    'type' => MENU_LOCAL_TASK,
+    'access arguments' => array('administer static site'),
+    'type' => MENU_CALLBACK,
     'file' => 'static.admin.inc',
   );
 
@@ -99,8 +137,8 @@ function static_menu() {
     'description' => 'Clear all the static files for the generator.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('static_admin_confirm', 4),
-    'access arguments' => array('administer site configuration'),
-    'type' => MENU_LOCAL_TASK,
+    'access arguments' => array('administer static site'),
+    'type' => MENU_CALLBACK,
     'file' => 'static.admin.inc',
   );
 
@@ -715,11 +753,37 @@ function static_preprocess_pager(&$variables) {
   // by the static generation system. We can capture how many pages there are
   // here.
   if (!isset($_GET['page'])) {
-    global $pager_page_array, $pager_total;
-    $info = static_get_info($_GET['q']);
-    // May be a better way of getting this but it is hardcoded in theme_pager_link()
-    $info['pager'] = 'page'; 
-    $info['pager_total'] = $pager_total[$variables['element']];
-    static_save_info($info);
+    global $pager_page_array, $pager_total, $user;
+    $path = $_GET['q'];
+
+    // Not sure this is the best way to check for anonymous user access.
+    // If we don't check anonymous access, this adds many admin pages.
+    $current_user = $user;
+    $user = drupal_anonymous_user();
+    $menu_item = menu_get_item($path);
+    // Can't use $menu_item['access'] directly since it was cached.
+    _menu_check_access($menu_item, $menu_item['original_map']);
+    $user = $current_user;
+    
+    if ($menu_item['access']) {
+      $info = static_get_info($path);
+      // May be a better way of getting this but it is hardcoded in theme_pager_link()
+      $info['pager'] = 'page'; 
+      $info['pager_total'] = $pager_total[$variables['element']];
+      static_save_info($info);
+    }
   }
+}
+
+/**
+ * Get the current status of the static generator
+ */
+function static_get_status() {
+  $query = db_select('static', 's')
+      ->fields('s', array('status'));
+  $query->addExpression('count(id)', 'count');
+  $results = $query->groupBy('status')
+      ->execute()
+      ->fetchAll();
+  return $results;
 }

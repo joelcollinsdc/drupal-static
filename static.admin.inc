@@ -58,70 +58,90 @@ function static_admin_settings() {
     '#description'   => t("If this it too long, it may cause problems with other tasks that run during the cron runs."),
   );
   
-  $form['generate'] = array(
-    '#type' => 'fieldset',
-    '#tree' => FALSE,
-    '#title' => t('Generate now'),
-  );
-  
-  $form['generate']['static_batch_size'] = array(
+  $form['static_batch_size'] = array(
     '#type' => 'textfield',
     '#title' => t('Number of items per batch run'),
     '#default_value' => variable_get('static_batch_size', STATIC_DEFAULT_CRON_LIMIT),
     '#size' => 4,
-  );
-  $form['generate']['button'] = array(
-    '#type' => 'submit',
-    '#value' => t('Generate now'),
+    '#description'   => t("This is the number of items to process per batch run. If too large, it may cause timeout issues."),
   );
 
-  $form['generate']['regenerate'] = array(
-    '#type' => 'submit',
-    '#value' => t('Queue all items for regeneration'),
-    '#prefix' => '<div>',
-    '#suffix' => '</div>',
-  );
-  $form['generate']['clear'] = array(
-    '#type' => 'submit',
-    '#value' => t('Clear all generated data'),
-    '#prefix' => '<div>',
-    '#suffix' => '</div>',
-  );
-  
-  $form['#submit'][] = 'static_admin_settings_submit';
-  
   return system_settings_form($form);
 }
 
 /**
- * Form validation handler for static_admin_settings().
+ * Page callback for static status
  */
-function static_admin_settings_validate(array &$form, array &$form_state) {
-  $values = $form_state['values'];
-  $all_lower = drupal_strtolower($values['all']);
-  if (in_array($values['op'], array(t('Generate now'), t('Save configuration')))) {
-    foreach (array('static_batch_size') as $field) {
-      $val = trim($values[$field]);
-      if (drupal_strtolower($val) == $all_lower) {
-        $val = -1;
-      }
-      elseif (!$val || !is_numeric($val) || ((int) $val) != $val) {
-        form_error($form['generate'][$field], t('Enter a non-zero integer. Use "-1" or "@all" for "all items".', array('@all' => $values['all'])));
-      }
-      else {
-        $val = (int) $val;
-      }
-      $form_state['values'][$field] = $val;
-    }
+function static_admin_status() {
+  $status = array(
+    STATIC_EXPIRED => 0,
+    STATIC_CURRENT => 0,
+    STATIC_ERROR => 0,
+    'total' => 0,
+  );
+  $results = static_get_status();
+  
+  foreach($results as $result) {
+    $status[$result->status] += $result->count;
+    $status['total'] += $result->count;
   }
-  else {
-    // For regenerate and clear, don't call system_settings_form_submit.
-    foreach($form['#submit'] as $id => $callback) {
-      if ($callback == 'system_settings_form_submit') {
-        unset($form['#submit'][$id]);
-      }
-    }
+  
+  $form['status'] = array(
+    '#type' => 'fieldset',
+    '#tree' => FALSE,
+    '#title' => t('Status'),
+  );
+  
+  $form['status']['current'] = array(
+    '#markup' => t('@current items generated and up to date.', array('@current' => $status[STATIC_CURRENT])),
+    '#prefix' => '<div>',
+    '#suffix' => '</div>',
+  );
+  
+  $form['status']['expired'] = array(
+    '#markup' => t('@expired items need generation.', array('@expired' => $status[STATIC_EXPIRED])),
+    '#prefix' => '<div>',
+    '#suffix' => '</div>',
+  );
+  
+  $form['status']['error'] = array(
+    '#markup' => t('@error items did not generate properly.', array('@error' => $status[STATIC_ERROR])),
+    '#prefix' => '<div>',
+    '#suffix' => '</div>',
+  );
+  
+  $form['status']['total'] = array(
+    '#markup' => t('@total total items.', array('@total' => $status['total'])),
+    '#prefix' => '<div>',
+    '#suffix' => '</div>',
+  );
+  
+  $form['actions'] = array(
+    '#type' => 'fieldset',
+    '#tree' => FALSE,
+    '#title' => t('Actions'),
+  );
+  
+  if ($status[STATIC_EXPIRED] > 0) {
+    $form['actions']['generate'] = array(
+      '#type' => 'submit',
+      '#value' => t('Generate now'),
+    );
   }
+
+  if ($status[STATIC_CURRENT] > 0 || $status[STATIC_ERROR] > 0) {
+    $form['actions']['regenerate'] = array(
+      '#type' => 'submit',
+      '#value' => t('Queue all items for regeneration'),
+    );
+  }
+  
+  $form['actions']['clear'] = array(
+    '#type' => 'submit',
+    '#value' => t('Clear all generated data'),
+  );
+  
+  return $form;
 }
 
 /**
@@ -129,13 +149,13 @@ function static_admin_settings_validate(array &$form, array &$form_state) {
  *
  * @see static_admin_index_status_form_validate()
  */
-function static_admin_settings_submit(array $form, array &$form_state) {
+function static_admin_status_submit(array $form, array &$form_state) {
   $values = $form_state['values'];
   $form_state['redirect'] = 'admin/config/system/static';
 
   switch ($values['op']) {
     case t('Generate now'):
-      if (!_static_batch_generating_create($values['static_batch_size'])) {
+      if (!_static_batch_generating_create(variable_get('static_batch_size', STATIC_DEFAULT_CRON_LIMIT))) {
         drupal_set_message(t("Couldn't create a batch, please check the batch size."), 'warning');
       }
       break;
@@ -220,4 +240,140 @@ function static_admin_confirm_submit(array $form, array &$form_state) {
   else {
     drupal_set_message(t('An error has occurred while performing the desired action. Check the logs for details.'), 'error');
   }
+}
+
+/**
+ * Page callback for static status
+ */
+function static_admin_paths() {
+  // Build the 'Update options' form.
+  $form['options'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Update options'),
+    '#attributes' => array('class' => array('container-inline')),
+    '#access' => $admin_access,
+  );
+  $options = array();
+  foreach (module_invoke_all('node_operations') as $operation => $array) {
+    $options[$operation] = $array['label'];
+  }
+  $form['options']['operation'] = array(
+    '#type' => 'select',
+    '#title' => t('Operation'),
+    '#title_display' => 'invisible',
+    '#options' => $options,
+    '#default_value' => 'approve',
+  );
+  $form['options']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Update'),
+    '#validate' => array('node_admin_nodes_validate'),
+    '#submit' => array('node_admin_nodes_submit'),
+  );
+
+  // Build the sortable table header.
+  $header = array(
+    'path' => array('data' => t('Path'), 'field' => 's.path'),
+    'alias' => array('data' => t('Alias'), 'field' => 's.alias'),
+    'file' => array('data' => t('Generated File'), 'field' => 's.file'),
+    'status' => array('data' => t('Status'), 'field' => 's.status'),
+    'updated' => array('data' => t('Updated'), 'field' => 's.updated', 'sort' => 'desc')
+  );
+  $header['operations'] = array('data' => t('Operations'));
+
+  $query = db_select('static', 's')
+      ->extend('PagerDefault')
+      ->extend('TableSort')
+      ->fields('s');
+  $filter_data = isset($_SESSION['node_overview_filter']) ? $_SESSION['node_overview_filter'] : array();
+  foreach ($filter_data as $index => $filter) {
+    list($key, $value) = $filter;
+    switch ($key) {
+      case 'status':
+        $query->condition('s.' . $key, $value);
+      case 'path':
+      case 'alias':
+        $query->condition('s.' . $key, '%' . $value . '%', 'LIKE');
+        break;
+    }
+  }
+
+  $infos = $query
+    ->limit(50)
+    ->orderByHeader($header)
+    ->execute()
+    ->fetchAll();
+
+  $destination = drupal_get_destination();
+  foreach ($infos as $info) {
+    $options[$info->id] = array(
+      'path' => check_plain($info->path),
+      'alias' => check_plain($info->alias),
+      'file' => check_plain($info->file),
+      'status' => ($info->status ? ($info->status == 2 ? t('error') : t('current')) : t('need generation')),
+      'updated' => format_date($info->updated, 'short'),
+    );
+    // Build a list of all the accessible operations for the current node.
+//    $operations = array();
+//    if (node_access('update', $node)) {
+//      $operations['edit'] = array(
+//        'title' => t('edit'),
+//        'href' => 'node/' . $node->nid . '/edit',
+//        'query' => $destination,
+//      );
+//    }
+//    if (node_access('delete', $node)) {
+//      $operations['delete'] = array(
+//        'title' => t('delete'),
+//        'href' => 'node/' . $node->nid . '/delete',
+//        'query' => $destination,
+//      );
+//    }
+//    $options[$node->nid]['operations'] = array();
+//    if (count($operations) > 1) {
+//      // Render an unordered list of operations links.
+//      $options[$node->nid]['operations'] = array(
+//        'data' => array(
+//          '#theme' => 'links__node_operations',
+//          '#links' => $operations,
+//          '#attributes' => array('class' => array('links', 'inline')),
+//        ),
+//      );
+//    }
+//    elseif (!empty($operations)) {
+//      // Render the first and only operation as a link.
+//      $link = reset($operations);
+//      $options[$node->nid]['operations'] = array(
+//        'data' => array(
+//          '#type' => 'link',
+//          '#title' => $link['title'],
+//          '#href' => $link['href'],
+//          '#options' => array('query' => $link['query']),
+//        ),
+//      );
+//    }
+  }
+
+  // Only use a tableselect when the current user is able to perform any
+  // operations.
+  if ($admin_access) {
+    $form['nodes'] = array(
+      '#type' => 'tableselect',
+      '#header' => $header,
+      '#options' => $options,
+      '#empty' => t('No content available.'),
+    );
+  }
+  // Otherwise, use a simple table.
+  else {
+    $form['nodes'] = array(
+      '#theme' => 'table',
+      '#header' => $header,
+      '#rows' => $options,
+      '#empty' => t('No content available.'),
+    );
+  }
+
+  $form['pager'] = array('#markup' => theme('pager'));
+  return $form;
 }

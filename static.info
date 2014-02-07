@@ -3,6 +3,8 @@ description = Generates a static version of the site.
 package = Performance and scalability
 core = 7.x
 
+configure = admin/config/system/static/settings
+
 recommends[] = expire
 dependencies[] = httprl
 
