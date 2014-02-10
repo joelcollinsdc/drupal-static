@@ -265,21 +265,27 @@ function static_expire_cache($paths) {
 }
 
 /**
+ * Expire all dynamic pages
+ */
+function static_expire_dynamic() {
+  $cache_time = variable_get('static_dynamic_cache_time', 300);
+  if ($cache_time >= 0) { // In case set to "never"
+    db_update('static')
+      ->fields(array(
+        'status' => 0
+      ))
+      ->condition('dynamic', 1)
+      ->condition('updated', REQUEST_TIME - $cache_time, '<=')
+      ->execute();
+  }
+}
+
+/**
  * Implements hook_cron()
  */
 function static_cron() {
   if (variable_get('static_cron', TRUE)) {
-    $cache_time = variable_get('static_dynamic_cache_time', 300);
-    if ($cache_time >= 0) { // In case set to "never"
-      db_update('static')
-        ->fields(array(
-          'status' => 0
-        ))
-        ->condition('dynamic', 1)
-        ->condition('updated', REQUEST_TIME - $cache_time, '<=')
-        ->execute();
-    }
-    
+    static_expire_dynamic();
     $results = db_select('static', 's')
       ->fields('s', array('path'))
       ->condition('status', 0)
@@ -615,12 +621,8 @@ function static_delete_dir($dir) {
  *   Whether the batch was created and set successfully.
  */
 function _static_batch_generating_create($batch_size) {
-  $limit = -1;
   $remaining = $batch_size;
-  if ($limit !== 0 && $batch_size !== 0) {
-    if ($limit < 0 || $limit > $remaining) {
-      $limit = $remaining;
-    }
+  if ($batch_size !== 0) {
     if ($batch_size < 0) {
       $batch_size = $remaining;
     }
@@ -650,15 +652,17 @@ function _static_batch_generating_create($batch_size) {
 function _static_batch_generating_callback($batch_size, &$context) {
   // Persistent data among batch runs.
   if (!isset($context['sandbox']['batch_size'])) {
-    $query = db_select('static', 's');
-    $query->fields('s');
-    $query->condition('status', STATIC_EXPIRED);
-    $result = $query->execute();
-    $context['sandbox']['limit'] = $result->rowCount();
-
     $context['sandbox']['batch_size'] = $batch_size;
     $context['sandbox']['progress'] = 0;
+    $context['sandbox']['start'] = time();
   }
+
+  $query = db_select('static', 's');
+  $query->fields('s');
+  $query->condition('status', STATIC_EXPIRED);
+  $result = $query->execute();
+  $context['sandbox']['remaining'] = $result->rowCount();
+  $context['sandbox']['limit'] = $context['sandbox']['progress'] + $context['sandbox']['remaining'];
 
   // Persistent data for results.
   if (!isset($context['results']['generated'])) {
@@ -667,7 +671,7 @@ function _static_batch_generating_callback($batch_size, &$context) {
   }
 
   // Number of items to generate for this run.
-  $to_generate = min($context['sandbox']['limit'] - $context['sandbox']['progress'], $context['sandbox']['batch_size']);
+  $to_generate = min($context['sandbox']['remaining'], $context['sandbox']['batch_size']);
 
   // Index the items.
   try {
@@ -697,6 +701,8 @@ function _static_batch_generating_callback($batch_size, &$context) {
 
   // Everything has been generated.
   if ($generated === 0 || $context['sandbox']['progress'] >= $context['sandbox']['limit']) {
+    $total_time = time() - $context['sandbox']['start'];
+    drupal_set_message('Generated ' . format_plural($context['sandbox']['progress'], '1 page', '@pages pages', array('@pages' => $context['sandbox']['progress'])) . ' in ' . $total_time . ' seconds. (' . round($context['sandbox']['progress']/$total_time, 2) . ' pages per second)');
     $context['finished'] = 1;
   }
   else {
