@@ -31,6 +31,13 @@ function static_admin_settings() {
     '#description'   => t("Use cron to generate static pages on the site."),
   );
 
+  $form['static_button'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable the publish button'),
+    '#default_value' => variable_get('static_button', TRUE),
+    '#description'   => t("Set the publish button for administrators on the site."),
+  );
+
   $form['static_dynamic_cache_time'] = array(
     '#type' => 'select',
     '#title' => t('Dynamic Cache Refresh'),

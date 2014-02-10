@@ -77,6 +77,10 @@ function static_permission() {
       'title' => t('Administer static site'),
       'description' => t('Perform administration tasks on the static built site.'),
     ),
+    'pubish static site' => array(
+      'title' => t('Pubish static site'),
+      'description' => t('Perform administration tasks on the static built site.'),
+    ),
   );  
 }
 
@@ -786,4 +790,28 @@ function static_get_status() {
       ->execute()
       ->fetchAll();
   return $results;
+}
+
+/**
+ * Implements hook_page_build().
+ */
+function static_page_build(&$page) {
+  if (!user_access('pubish static site') || !variable_get('static_button', TRUE)) {
+    return;
+  }
+  $status = array(
+    STATIC_EXPIRED => 0,
+    STATIC_CURRENT => 0,
+    STATIC_ERROR => 0,
+    'total' => 0,
+  );
+  $results = static_get_status();
+  
+  foreach($results as $result) {
+    $status[$result->status] += $result->count;
+    $status['total'] += $result->count;
+  }
+  drupal_add_js(array('static' => $status), 'setting');
+  drupal_add_js(drupal_get_path('module', 'static') . '/js/static.js', array('every_page' => TRUE));
+  drupal_add_css($page['#attached']['css'][] = drupal_get_path('module', 'static') . '/css/static.css', array('every_page' => TRUE));
 }
