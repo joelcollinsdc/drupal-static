@@ -132,7 +132,7 @@ function static_admin_status() {
   if ($status[STATIC_EXPIRED] > 0) {
     $form['actions']['generate'] = array(
       '#type' => 'submit',
-      '#value' => t('Generate now'),
+      '#value' => t('Publish now'),
     );
   }
 
