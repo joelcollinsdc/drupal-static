@@ -1,6 +1,11 @@
 <?php
 
 /**
+ * @file
+ * Install file for static module.
+ */
+
+/**
  * Implements hook_schema().
  */
 function static_schema() {
@@ -85,16 +90,14 @@ function static_requirements($phase) {
   global $base_url;
   $requirements = array();
   $t = get_t();
-  // Check the server's ability to use static
+  // Check the server's ability to use static.
   if ($phase == 'runtime') {
-    // Check cache directories
+    // Check cache directories.
     $cache_directories = array(
       static_get_normal_cache_dir(),
     );
     foreach ($cache_directories as $cache_directory) {
-      if (static_mkdir($cache_directory)) {
-//         $root_file = file_put_contents($cache_directory . '/' . variable_get('static_root_file', '.static'), $cache_directory);
-      }
+      static_mkdir($cache_directory);
       if (!is_dir($cache_directory)) {
         $requirements['static_default'] = array(
           'title'       => $t('Static'),

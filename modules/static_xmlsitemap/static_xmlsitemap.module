@@ -6,7 +6,7 @@
  */
 
 /**
- * Implements hook_xmlsitemap_link_insert($link)
+ * Implements hook_xmlsitemap_link_insert().
  */
 function static_xmlsitemap_xmlsitemap_link_insert($link) {
   // Don't track links that are not access, status off or contain a wildcard.
@@ -16,7 +16,7 @@ function static_xmlsitemap_xmlsitemap_link_insert($link) {
 }
 
 /**
- * Implements hook_xmlsitemap_link_update($link)
+ * Implements hook_xmlsitemap_link_update().
  */
 function static_xmlsitemap_xmlsitemap_link_update($link) {
   // Don't track links that are not access, status off or contain a wildcard.
@@ -27,6 +27,7 @@ function static_xmlsitemap_xmlsitemap_link_update($link) {
 
 /**
  * Implements hook_static_refresh_paths().
+ *
  * Refresh all paths for the static module.
  */
 function static_xmlsitemap_static_refresh_paths() {

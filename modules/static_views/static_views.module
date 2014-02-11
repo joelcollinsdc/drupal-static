@@ -7,6 +7,7 @@
 
 /**
  * Implements hook_static_refresh_paths().
+ *
  * Refresh all paths for the static module.
  */
 function static_views_static_refresh_paths() {

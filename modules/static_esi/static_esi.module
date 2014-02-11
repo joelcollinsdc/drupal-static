@@ -6,6 +6,8 @@
  */
 
 /**
+ * Implements hoo_static_filename_alter().
+ *
  * Have static generate files without .html extension as this is what
  * the esi path is expecting. This works since they aren'te html pages.
  */
@@ -16,7 +18,7 @@ function static_esi_static_filename_alter(&$filename, $info) {
 }
 
 /**
- * Implements hook_esi_block_url_alter(&$url)
+ * Implements hook_esi_block_url_alter().
  */
 function static_esi_esi_block_url_alter(&$url) {
   // Since we don't have querystrings, roles or users on a static site,
@@ -31,13 +33,13 @@ function static_esi_esi_block_url_alter(&$url) {
       array(
         'path' => $url,
         'dynamic' => 1,
-      )
+      ),
     )
   );
 }
 
 /**
- * Implements hook_context_block_url_alter(&$url)
+ * Implements hook_context_block_url_alter().
  */
 function static_esi_esi_context_url_alter($url) {
   // Since we don't have querystrings, roles or users on a static site,
@@ -52,13 +54,13 @@ function static_esi_esi_context_url_alter($url) {
       array(
         'path' => $url,
         'dynamic' => 1,
-      )
+      ),
     )
   );
 }
 
 /**
- * Implements hook_panels_block_url_alter(&$url)
+ * Implements hook_panels_block_url_alter().
  */
 function static_esi_esi_panels_url_alter($url) {
   // TODO: Do we need to do something to the url to simplify it?
@@ -67,6 +69,7 @@ function static_esi_esi_panels_url_alter($url) {
 
 /**
  * Implements hook_static_refresh_paths().
+ *
  * Refresh all paths for the static module.
  */
 function static_esi_static_refresh_paths() {
@@ -74,12 +77,6 @@ function static_esi_static_refresh_paths() {
   // generated all links should be captured by the above hooks.
   return array();
 }
-
-// Need more ways to clear the esi static cache files.
-// Views blocks
-// Panel blocks
-// Other module blocks
-// Perhaps just set them to refresh on cron every 15 minutes?
 
 /**
  * Implements hook_form_FORM_ID_alter().
@@ -89,6 +86,8 @@ function static_esi_form_block_admin_configure_alter(&$form, $form_state) {
 }
 
 /**
+ * Submit handler for block_admin_configure().
+ *
  * When a block is saved, clear the static cache for that block.
  */
 function static_esi_block_admin_configure_form_submit($form, $form_state) {

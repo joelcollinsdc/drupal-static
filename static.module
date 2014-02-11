@@ -35,9 +35,11 @@ define('STATIC_NORMAL_DIR', 'normal');
  */
 define('STATIC_DEFAULT_CRON_LIMIT', 60);
 
-include_once('static.file.inc');
+include_once 'static.file.inc';
 
 /**
+ * Static track paths.
+ *
  * Use this function to tell the static module to track paths. This is useful
  * for submodules to make sure that all paths get included.
  */
@@ -51,7 +53,7 @@ function static_track_paths($paths) {
 /**
  * Track a single path.
  *
- * @param type $path can either be a string which represents the path or an
+ * $path can either be a string which represents the path or an
  * info array.
  *
  * For multiple paths, use static_track_paths
@@ -59,12 +61,13 @@ function static_track_paths($paths) {
 function static_track_path($path) {
   if (is_array($path)) {
     $info = static_get_info($path['path']);
-    $info = $path + $info; // Merge the arrays.
+    // Merge the arrays.
+    $info = $path + $info;
   }
   else {
     $info = static_get_info($path);
   }
-  // Only process new paths
+  // Only process new paths.
   if (!isset($info['id'])) {
     static_save_info($info);
   }
@@ -150,7 +153,7 @@ function static_menu() {
 }
 
 /**
- * Load a static path info
+ * Load a static path info.
  */
 function static_get_info($path) {
   // Special case for the front page since it is weird.
@@ -199,7 +202,7 @@ function static_get_info($path) {
 }
 
 /**
- * Save a static path
+ * Save a static path.
  */
 function static_save_info($info) {
   $keys = array();
@@ -210,7 +213,7 @@ function static_save_info($info) {
 }
 
 /**
- * Generate a filename
+ * Generate a filename.
  */
 function static_filename($info) {
   // Special case for index.html
@@ -218,14 +221,14 @@ function static_filename($info) {
     $filename = 'index.html';
   }
   else {
-    $filename =  $info['alias'];
+    $filename = $info['alias'];
 
     // If the filename does not have .html, add it.
     if (substr_compare($filename, '.html', -5, 5) !== 0) {
       $filename .= '.html';
     }
 
-    // Replace the ? in the querystring with _ so that the web server can find it.
+    // Replace the ? with _ so that the web server can find it.
     $filename = str_replace('?', '_', $filename);
   }
 
@@ -236,7 +239,7 @@ function static_filename($info) {
 }
 
 /**
- * Function to set a path to regenerate
+ * Function to set a path to regenerate.
  */
 function static_set_expired($path) {
   $paths = &drupal_static(__FUNCTION__);
@@ -252,7 +255,7 @@ function static_set_expired($path) {
 }
 
 /**
- * Implements hook_expire_cache (from the 'expire' module)
+ * Implements hook_expire_cache().
  */
 function static_expire_cache($paths) {
   global $base_root;
@@ -265,14 +268,15 @@ function static_expire_cache($paths) {
 }
 
 /**
- * Expire all dynamic pages
+ * Expire all dynamic pages.
  */
 function static_expire_dynamic() {
   $cache_time = variable_get('static_dynamic_cache_time', 300);
-  if ($cache_time >= 0) { // In case set to "never"
+  // In case set to "never".
+  if ($cache_time >= 0) {
     db_update('static')
       ->fields(array(
-        'status' => 0
+        'status' => 0,
       ))
       ->condition('dynamic', 1)
       ->condition('updated', REQUEST_TIME - $cache_time, '<=')
@@ -292,7 +296,7 @@ function static_cron() {
       ->execute()
       ->fetchAllKeyed(0, 0);
     foreach ($results as $path) {
-      // Put URLs in a queue for processing by cron
+      // Put URLs in a queue for processing by cron.
       $queue = DrupalQueue::get('static');
       $queue->createItem($path);
     }
@@ -305,7 +309,8 @@ function static_cron() {
 function static_cron_queue_info() {
   $queues['static'] = array(
     'worker callback' => 'static_generate_file',
-    'time' => variable_get('static_queue_seconds', 30), // max run time to claim per cron run (in seconds).
+    // Max run time to claim per cron run (in seconds).
+    'time' => variable_get('static_queue_seconds', 30),
   );
 
   return $queues;
@@ -317,8 +322,9 @@ function static_cron_queue_info() {
 function static_generate_file($path) {
   global $base_url;
   $info = static_get_info($path);
-  // If status is 1, we don't want to regenerate again. Only regenerated status 0
-  // This can happen when items get left in the queue and are there for multiple runs.
+  // If status is 1, we don't want to regenerate again. Only regenerated
+  // status 0. This can happen when items get left in the queue and are there
+  // for multiple runs.
   if ($info['status']) {
     return TRUE;
   }
@@ -328,7 +334,8 @@ function static_generate_file($path) {
   $request = httprl_send_request();
 
   if ($request[$absolute_url]->code == 200) {
-    // Reload the static info as it may have changed during the request. (pager)
+    // Reload the static info as it may have changed during the request.
+    // If the page has a pager it will have changed.
     $info = static_get_info($path);
 
     static_set_filename($info);
@@ -339,7 +346,7 @@ function static_generate_file($path) {
 
     if (isset($info['pager']) && isset($info['pager_total'])) {
       $pager_total = intval($info['pager_total']);
-      for ($i=1; $i < $pager_total; $i++) {
+      for ($i = 1; $i < $pager_total; $i++) {
         $pager_path = $info['path'] . '?' . $info['pager'] . '=' . $i;
         $pager_paths[$pager_path] = array(
           'path' => $pager_path,
@@ -349,7 +356,8 @@ function static_generate_file($path) {
       static_track_paths($pager_paths);
     }
 
-    // Drupal creates absolute urls for many links. We need to make these relative.
+    // Drupal creates absolute urls for many links. We need to make these
+    // relative.
     $data = str_replace($base_url, '', $request[$absolute_url]->data);
 
     static_copy_linked_files($data);
@@ -359,7 +367,8 @@ function static_generate_file($path) {
   }
 
   else {
-    // This can happen if something is deleted. We want to remove the corresponding file.
+    // This can happen if something is deleted. We want to remove the
+    // corresponding file.
     if ($request[$absolute_url]->code == 404 && $info['file']) {
       @unlink(static_get_normal_cache_dir() . '/' . $info['file']);
     }
@@ -372,8 +381,6 @@ function static_generate_file($path) {
 
 /**
  * Find any linked files within the page and copy them over to the destination.
- *
- * @param type $data
  */
 function static_copy_linked_files($data) {
   // Should find a way of caching the results so we aren't constantly
@@ -381,10 +388,11 @@ function static_copy_linked_files($data) {
   $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
   $files_dir = $wrapper->getDirectoryPath();
   $srcs = array();
-  // Match src="/{anything}"
+  // Match src="/{anything}".
   preg_match_all('/src="\/([^"]*)"/i', $data, $srcs);
   $hrefs = array();
-  // Match href="/{anything}.{ico|css|pdf|doc}(?{anything})" () querystring is optional
+  // Match href="/{anything}.{ico|css|pdf|doc}(?{anything})" () querystring is
+  // optional.
   preg_match_all('/href="\/([^"]*.\.(' . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ')(\?[^"]*.)?)"/i', $data, $hrefs);
   $matches = array_merge($srcs[1], $hrefs[1]);
   foreach ($matches as $match) {
@@ -417,7 +425,7 @@ function static_copy_linked_files($data) {
 }
 
 /**
- * Callback to generate multiple files based on files with status=0
+ * Callback to generate multiple files based on files with status=0.
  */
 function static_generate_files($limit) {
   // May be a way to do multiple requests at a time to optimize this.
@@ -434,7 +442,9 @@ function static_generate_files($limit) {
 }
 
 /**
- * Set the filename if needed. If it already exists but is different, delete the
+ * Set the filename if needed.
+ *
+ * If it already exists but is different, delete the
  * old file and create a redirect.
  */
 function static_set_filename(&$info) {
@@ -469,11 +479,6 @@ function static_set_filename(&$info) {
 
 /**
  * Write to a file. Ensures write is atomic via rename operation.
- *
- * @param $filename
- *  relative filename.
- * @param $data
- *  data to write to the file.
  */
 function static_write_file($filename, $data, $chmod = 0644) {
   // Create directory if it doesn't exist.
@@ -488,16 +493,13 @@ function static_write_file($filename, $data, $chmod = 0644) {
     return FALSE;
   }
 
-  // chmod file so webserver can send it out.
+  // Chmod file so webserver can send it out.
   drupal_chmod($filename, $chmod);
   return TRUE;
 }
 
 /**
  * Create a directory.
- *
- * @param $directory
- *  relative directory.
  */
 function static_mkdir($directory) {
   global $_static;
@@ -528,9 +530,6 @@ function static_get_normal_cache_dir() {
 
 /**
  * Verify that the operation is going to operate in the cache dir.
- *
- * @param $file
- *  relative directory or file.
  */
 function static_in_cache_dir($file) {
   global $_static;
@@ -542,7 +541,7 @@ function static_in_cache_dir($file) {
 
   // Only operate in the cache dir.
   // Check the real path.
-  if (   strpos($file, $cache_dir) !== 0
+  if (strpos($file, $cache_dir) !== 0
       || ($real_file && $real_cache_dir && strpos($real_file, $real_cache_dir) !== 0)
         ) {
     $good = FALSE;
@@ -550,7 +549,7 @@ function static_in_cache_dir($file) {
 
   // Send error to watchdog.
   if (!$good) {
-    watchdog('static', 'An operation outside of the cache directory was attempted on your system. %file or %real_file is outside the cache directory %cache or %real_cache. Debug info below <br>', array(
+    watchdog('static', 'An operation outside of the cache directory was attempted on your system. %file or %real_file is outside the cache directory %cache or %real_cache.', array(
       '%file'       => $file,
       '%real_file'  => $real_file,
       '%cache'      => $cache_dir,
@@ -563,7 +562,7 @@ function static_in_cache_dir($file) {
 }
 
 /**
- * Set all pages to be regenerated
+ * Set all pages to be regenerated.
  */
 function static_regenerate() {
   // Make sure we know about all paths in case some got missed.
@@ -594,7 +593,7 @@ function static_clear() {
 }
 
 /**
- * function to delete directory and everything under it.
+ * Delete directory and everything under it.
  */
 function static_delete_dir($dir) {
   $files = array_diff(scandir($dir), array('.', '..'));
@@ -611,12 +610,6 @@ function static_delete_dir($dir) {
 
 /**
  * Creates and sets a batch for generating items.
- *
- * @param int $batch_size
- *   Number of items to generate per batch.
- *
- * @return bool
- *   Whether the batch was created and set successfully.
  */
 function _static_batch_generating_create($batch_size) {
   $remaining = $batch_size;
@@ -641,11 +634,6 @@ function _static_batch_generating_create($batch_size) {
 
 /**
  * Batch API callback for the generating functionality.
- *
- * @param integer $batch_size
- *   Number of items to generate per batch.
- * @param $context
- *   An array (or object implementing ArrayAccess) containing the batch context.
  */
 function _static_batch_generating_callback($batch_size, &$context) {
   // Persistent data among batch runs.
@@ -700,7 +688,7 @@ function _static_batch_generating_callback($batch_size, &$context) {
   // Everything has been generated.
   if ($generated === 0 || $context['sandbox']['progress'] >= $context['sandbox']['limit']) {
     $total_time = time() - $context['sandbox']['start'];
-    $message = 'Generated ' . format_plural($context['sandbox']['progress'], '1 page', '@pages pages', array('@pages' => $context['sandbox']['progress'])) . ' in ' . $total_time . ' seconds. (' . round($context['sandbox']['progress']/$total_time, 2) . ' pages per second)';
+    $message = 'Generated ' . format_plural($context['sandbox']['progress'], '1 page', '@pages pages', array('@pages' => $context['sandbox']['progress'])) . ' in ' . $total_time . ' seconds. (' . round($context['sandbox']['progress'] / $total_time, 2) . ' pages per second)';
     drupal_set_message(check_plain($message));
     $context['finished'] = 1;
   }
@@ -710,7 +698,7 @@ function _static_batch_generating_callback($batch_size, &$context) {
 }
 
 /**
- * Refresh all known paths for the static module
+ * Refresh all known paths for the static module.
  */
 function static_refresh_paths() {
   // On larger sites this might run into php limit issues (memory and time).
@@ -776,7 +764,8 @@ function static_preprocess_pager(&$variables) {
 
     if ($menu_item['access']) {
       $info = static_get_info($path);
-      // May be a better way of getting this but it is hardcoded in theme_pager_link()
+      // May be a better way of getting this but it is hardcoded in
+      // theme_pager_link().
       $info['pager'] = 'page';
       $info['pager_total'] = $pager_total[$variables['element']];
       static_save_info($info);
@@ -785,7 +774,7 @@ function static_preprocess_pager(&$variables) {
 }
 
 /**
- * Get the current status of the static generator
+ * Get the current status of the static generator.
  */
 function static_get_status() {
   $query = db_select('static', 's')

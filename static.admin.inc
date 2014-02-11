@@ -64,7 +64,7 @@ function static_admin_settings() {
     '#default_value' => variable_get('static_queue_seconds', 30),
     '#description'   => t("If this it too long, it may cause problems with other tasks that run during the cron runs."),
   );
-  
+
   $form['static_batch_size'] = array(
     '#type' => 'textfield',
     '#title' => t('Number of items per batch run'),
@@ -77,7 +77,7 @@ function static_admin_settings() {
 }
 
 /**
- * Page callback for static status
+ * Page callback for static status.
  */
 function static_admin_status() {
   $status = array(
@@ -87,48 +87,48 @@ function static_admin_status() {
     'total' => 0,
   );
   $results = static_get_status();
-  
-  foreach($results as $result) {
+
+  foreach ($results as $result) {
     $status[$result->status] += $result->count;
     $status['total'] += $result->count;
   }
-  
+
   $form['status'] = array(
     '#type' => 'fieldset',
     '#tree' => FALSE,
     '#title' => t('Status'),
   );
-  
+
   $form['status']['current'] = array(
     '#markup' => t('@current items generated and up to date.', array('@current' => $status[STATIC_CURRENT])),
     '#prefix' => '<div>',
     '#suffix' => '</div>',
   );
-  
+
   $form['status']['expired'] = array(
     '#markup' => t('@expired items need generation.', array('@expired' => $status[STATIC_EXPIRED])),
     '#prefix' => '<div>',
     '#suffix' => '</div>',
   );
-  
+
   $form['status']['error'] = array(
     '#markup' => t('@error items did not generate properly.', array('@error' => $status[STATIC_ERROR])),
     '#prefix' => '<div>',
     '#suffix' => '</div>',
   );
-  
+
   $form['status']['total'] = array(
     '#markup' => t('@total total items.', array('@total' => $status['total'])),
     '#prefix' => '<div>',
     '#suffix' => '</div>',
   );
-  
+
   $form['actions'] = array(
     '#type' => 'fieldset',
     '#tree' => FALSE,
     '#title' => t('Actions'),
   );
-  
+
   if ($status[STATIC_EXPIRED] > 0) {
     $form['actions']['generate'] = array(
       '#type' => 'submit',
@@ -142,12 +142,12 @@ function static_admin_status() {
       '#value' => t('Queue all items for regeneration'),
     );
   }
-  
+
   $form['actions']['clear'] = array(
     '#type' => 'submit',
     '#value' => t('Clear all generated data'),
   );
-  
+
   return $form;
 }
 
@@ -180,20 +180,6 @@ function static_admin_status_submit(array $form, array &$form_state) {
 
 /**
  * Form constructor for a generic confirmation form.
- *
- * @param $type
- *   The type of entity (not the real "entity type"). Either "server" or
- *   "index".
- * @param $action
- *   The action that would be executed for this entity after confirming. One of
- *   "reindex" ("index" type only), "clear", "disable" or "delete".
- * @param Entity $entity
- *   The entity for which the action would be performed. Must have a "name"
- *   property.
- *
- * @return array|false
- *   Either a form array, or FALSE if this combination of type and action is
- *   not supported.
  */
 function static_admin_confirm(array $form, array &$form_state, $action) {
   switch ($action) {
@@ -210,10 +196,11 @@ function static_admin_confirm(array $form, array &$form_state, $action) {
       $text = array(
         t('Clear static cache'),
         t('Do you really want to clear the entire static cache?'),
-        t('This will remove all files that are currently generated. Before the pages is regenerated, there won\' be any files if the files are publicly visible. This action cannot be undone.'),
+        t('This will remove all files that are currently generated. Before the pages is regenerated, there wont be any files if the files are publicly visible. This action cannot be undone.'),
         t('The cache was successfully deleted.'),
       );
       break;
+
     default:
       return FALSE;
   }
@@ -228,7 +215,7 @@ function static_admin_confirm(array $form, array &$form_state, $action) {
     ),
   );
   $desc = "<h3>{$text[1]}</h3><p>{$text[2]}</p>";
-  return confirm_form($form, $text[0], "admin/config/system/static", $desc);
+  return confirm_form($form, check_plain($text[0]), "admin/config/system/static", check_plain($desc));
 }
 
 /**
@@ -236,7 +223,7 @@ function static_admin_confirm(array $form, array &$form_state, $action) {
  */
 function static_admin_confirm_submit(array $form, array &$form_state) {
   $form_state['redirect'] = 'admin/config/system/static';
-  
+
   $values = $form_state['values'];
 
   $action = $values['action'];
@@ -251,7 +238,7 @@ function static_admin_confirm_submit(array $form, array &$form_state) {
 }
 
 /**
- * Page callback for static status
+ * Page callback for static status.
  */
 function static_admin_paths() {
   // Form to add a path to tracking.
@@ -261,9 +248,9 @@ function static_admin_paths() {
     '#collapsed' => TRUE,
     '#attributes' => array('class' => array('exposed-filters')),
     '#title' => 'Add a path',
-    '#tree' => TRUE
+    '#tree' => TRUE,
   );
-  
+
   $form['new']['path'] = array(
     '#type' => 'textfield',
     '#title' => 'Path',
@@ -274,14 +261,14 @@ function static_admin_paths() {
     '#title' => 'Dymamic',
     '#description' => 'Check this box if the page has a list of content that should be updated regularly by cron such as a view page.',
   );
-  
+
   $form['new']['add'] = array(
     '#type' => 'submit',
     '#value' => t('Add'),
   );
-  
+
   $session = isset($_SESSION['static_path_filter']) ? $_SESSION['static_path_filter'] : array();
-  
+
   $session += array(
     'status' => '',
     'path' => '',
@@ -293,7 +280,7 @@ function static_admin_paths() {
     '#attributes' => array('class' => array('exposed-filters')),
     '#title' => t('Show only items where'),
   );
-  
+
   $form['filters']['filters'] = array(
     '#type' => 'container',
     '#tree' => TRUE,
@@ -311,7 +298,7 @@ function static_admin_paths() {
     ),
     '#default_value' => $session['status'],
   );
-  
+
   $form['filters']['filters']['path'] = array(
     '#type' => 'textfield',
     '#title' => 'path',
@@ -368,7 +355,11 @@ function static_admin_paths() {
     'file' => array('data' => t('Generated File'), 'field' => 's.file'),
     'dynamic' => array('data' => t('Dynamic Page'), 'field' => 's.dynamic'),
     'status' => array('data' => t('Status'), 'field' => 's.status'),
-    'updated' => array('data' => t('Updated'), 'field' => 's.updated', 'sort' => 'desc')
+    'updated' => array(
+      'data' => t('Updated'),
+      'field' => 's.updated',
+      'sort' => 'desc',
+    ),
   );
 
   $query = db_select('static', 's')
@@ -402,7 +393,7 @@ function static_admin_paths() {
       'path' => check_plain($info->path),
       'alias' => check_plain($info->alias),
       'file' => check_plain($info->file),
-      'dynamic' => ($info->dynamic?'Yes':'No'),
+      'dynamic' => ($info->dynamic ? 'Yes' : 'No'),
       'status' => ($info->status ? ($info->status == 2 ? t('error') : t('current')) : t('needs generation')),
       'updated' => format_date($info->updated, 'short'),
     );
@@ -420,7 +411,7 @@ function static_admin_paths() {
 }
 
 /**
- * Submit handler for static_admin_paths()
+ * Submit handler for static_admin_paths().
  */
 function static_admin_paths_submit($form, &$form_state) {
   switch ($form_state['values']['op']) {
@@ -428,20 +419,24 @@ function static_admin_paths_submit($form, &$form_state) {
     case t('Refine'):
       $_SESSION['static_path_filter'] = $form_state['values']['filters'];
       break;
+
     case t('Reset'):
       $_SESSION['static_path_filter'] = array();
       break;
+
     case t('Add'):
       static_track_path($form_state['values']['new']);
       break;
+
     case t('Update'):
-      switch($form_state['values']['operation']) {
+      switch ($form_state['values']['operation']) {
         case 'regenerate_paths':
           db_update('static')
             ->fields(array('status' => 0))
             ->condition('id', $form_state['values']['items'], 'IN')
             ->execute();
           break;
+
         case 'delete_paths':
           // Need to add a confirm form here as well as instructions that it
           // doesn't delete the generated files as well yet.
@@ -449,6 +444,7 @@ function static_admin_paths_submit($form, &$form_state) {
             ->condition('id', $form_state['values']['items'], 'IN')
             ->execute();
           break;
+
       }
       break;
   }
