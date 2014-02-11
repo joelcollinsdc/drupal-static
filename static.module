@@ -38,42 +38,6 @@ define('STATIC_DEFAULT_CRON_LIMIT', 60);
 include_once 'static.file.inc';
 
 /**
- * Static track paths.
- *
- * Use this function to tell the static module to track paths. This is useful
- * for submodules to make sure that all paths get included.
- */
-function static_track_paths($paths) {
-  // There probably is some way to optimize this.
-  foreach ($paths as $path) {
-    static_track_path($path);
-  }
-}
-
-/**
- * Track a single path.
- *
- * $path can either be a string which represents the path or an
- * info array.
- *
- * For multiple paths, use static_track_paths
- */
-function static_track_path($path) {
-  if (is_array($path)) {
-    $info = static_get_info($path['path']);
-    // Merge the arrays.
-    $info = $path + $info;
-  }
-  else {
-    $info = static_get_info($path);
-  }
-  // Only process new paths.
-  if (!isset($info['id'])) {
-    static_save_info($info);
-  }
-}
-
-/**
  * Implements hook_permission().
  */
 function static_permission() {
@@ -153,6 +117,87 @@ function static_menu() {
 }
 
 /**
+ * Static track paths.
+ *
+ * Use this function to tell the static module to track paths. This is useful
+ * for submodules to make sure that all paths get included.
+ */
+function static_track_paths($paths) {
+  // There probably is some way to optimize this.
+  foreach ($paths as $path) {
+    static_track_path($path);
+  }
+}
+
+/**
+ * Track a single path.
+ *
+ * $path can either be a string which represents the path or an
+ * info array.
+ *
+ * For multiple paths, use static_track_paths
+ */
+function static_track_path($path) {
+  if (is_array($path)) {
+    $info = static_get_info($path['path']);
+    // Merge the arrays.
+    $info = $path + $info;
+  }
+  else {
+    $info = static_get_info($path);
+  }
+  // Only process new paths.
+  if (!isset($info['id'])) {
+    static_save_info($info);
+  }
+}
+
+/**
+ * Refresh all known paths for the static module.
+ */
+function static_refresh_paths() {
+  // On larger sites this might run into php limit issues (memory and time).
+  $paths = module_invoke_all('static_refresh_paths');
+
+  drupal_alter('static_refresh_paths', $paths);
+
+  static_track_paths($paths);
+}
+
+/**
+ * Implements hook_static_refresh_paths().
+ *
+ * Return info about system paths.
+ */
+function static_static_refresh_paths() {
+  $paths = array();
+  $paths[''] = array(
+    'path' => '<front>',
+    'dynamic' => 1,
+  );
+  $paths['node'] = array(
+    'path' => 'node',
+    'pager' => 'page',
+    'dynamic' => 1,
+  );
+  $site_404 = variable_get('site_404', '');
+  if ($site_404 != '') {
+    $paths[$site_404] = array(
+      'type' => 'system',
+      'path' => $site_404,
+    );
+  }
+  $site_403 = variable_get('site_403', '');
+  if ($site_403 != '') {
+    $paths[$site_403] = array(
+      'type' => 'system',
+      'path' => $site_403,
+    );
+  }
+  return $paths;
+}
+
+/**
  * Load a static path info.
  */
 function static_get_info($path) {
@@ -213,29 +258,29 @@ function static_save_info($info) {
 }
 
 /**
- * Generate a filename.
+ * Get the current status of the static generator.
  */
-function static_filename($info) {
-  // Special case for index.html
-  if ($info['alias'] == '') {
-    $filename = 'index.html';
-  }
-  else {
-    $filename = $info['alias'];
+function static_get_status() {
+  $query = db_select('static', 's')
+      ->fields('s', array('status'));
+  $query->addExpression('count(id)', 'count');
+  $results = $query->groupBy('status')
+      ->execute()
+      ->fetchAll();
+  return $results;
+}
 
-    // If the filename does not have .html, add it.
-    if (substr_compare($filename, '.html', -5, 5) !== 0) {
-      $filename .= '.html';
+/**
+ * Implements hook_expire_cache().
+ */
+function static_expire_cache($paths) {
+  global $base_root;
+
+  if (variable_get('static_cron', TRUE)) {
+    foreach ($paths as $path => $absolute) {
+      static_set_expired($path);
     }
-
-    // Replace the ? with _ so that the web server can find it.
-    $filename = str_replace('?', '_', $filename);
   }
-
-  // Allow other modules to modify the filename.
-  drupal_alter('static_filename', $filename, $info);
-
-  return $filename;
 }
 
 /**
@@ -251,19 +296,6 @@ function static_set_expired($path) {
     static_save_info($info);
 
     $paths[$info['path']] = TRUE;
-  }
-}
-
-/**
- * Implements hook_expire_cache().
- */
-function static_expire_cache($paths) {
-  global $base_root;
-
-  if (variable_get('static_cron', TRUE)) {
-    foreach ($paths as $path => $absolute) {
-      static_set_expired($path);
-    }
   }
 }
 
@@ -317,7 +349,12 @@ function static_cron_queue_info() {
 }
 
 /**
+ * Generate a static html file.
+ *
  * Worker Callback for batches.
+ *
+ * This is the most important function that actually does the generation
+ * of the html file.
  */
 function static_generate_file($path) {
   global $base_url;
@@ -338,7 +375,14 @@ function static_generate_file($path) {
     // If the page has a pager it will have changed.
     $info = static_get_info($path);
 
-    static_set_filename($info);
+    $newfile = static_filename($info);
+    // Check to see if a file previously existed but is different.
+    if ($info['file'] != '' && $info['file'] != $newfile) {
+      static_redirect_page($info['file'], $newfile);
+    }
+
+    $info['file'] = $newfile;
+
     $info['status'] = STATIC_CURRENT;
     $info['updated'] = REQUEST_TIME;
 
@@ -377,6 +421,33 @@ function static_generate_file($path) {
   }
 
   watchdog('static', 'Statically generated !file', array('!file' => $info['file']), WATCHDOG_DEBUG);
+}
+
+/**
+ * Generate a filename.
+ */
+function static_filename($info) {
+  // Special case for index.html
+  if ($info['alias'] == '') {
+    $filename = 'index.html';
+  }
+  else {
+    $filename = $info['alias'];
+
+    // If the filename does not have .html, add it.
+    if (substr_compare($filename, '.html', -5, 5) !== 0) {
+      $filename .= '.html';
+    }
+
+    // Replace the ? for querystrings on pagers with _ so that the web server
+    // can find it.
+    $filename = str_replace('?', '_', $filename);
+  }
+
+  // Allow other modules to modify the filename.
+  drupal_alter('static_filename', $filename, $info);
+
+  return $filename;
 }
 
 /**
@@ -442,126 +513,6 @@ function static_generate_files($limit) {
 }
 
 /**
- * Set the filename if needed.
- *
- * If it already exists but is different, delete the
- * old file and create a redirect.
- */
-function static_set_filename(&$info) {
-  $newfile = static_filename($info);
-  // Check to see if a file previously existed but is different.
-  if ($info['file'] != '' && $info['file'] != $newfile) {
-    // This is a simple html page that redirects to the new page.
-    $data = '<html>' . PHP_EOL
-        . '  <head>' . PHP_EOL
-        . '    <meta http-equiv="refresh" content="0;URL=/' . $newfile . '">' . PHP_EOL
-        . '  </head>' . PHP_EOL
-        . '  <body>' . PHP_EOL
-        . '    <a href="/' . $newfile . '">Page has moved to this location.</a>' . PHP_EOL
-        . '  </body>' . PHP_EOL
-        . '</html>' . PHP_EOL;
-
-    // Create directory if it doesn't exist.
-    $directory = dirname(static_get_normal_cache_dir() . '/' . $info['file']);
-    if (!static_mkdir($directory)) {
-      return FALSE;
-    }
-    // Save the redirect to the system.
-    if (file_put_contents(static_get_normal_cache_dir() . '/' . $info['file'], $data) === FALSE) {
-      watchdog('static', 'Could not create the file %file on your system', array('%file' => $filename), WATCHDOG_ERROR);
-      return FALSE;
-    }
-
-  }
-
-  $info['file'] = $newfile;
-}
-
-/**
- * Write to a file. Ensures write is atomic via rename operation.
- */
-function static_write_file($filename, $data, $chmod = 0644) {
-  // Create directory if it doesn't exist.
-  $directory = dirname($filename);
-  if (!static_mkdir($directory)) {
-    return FALSE;
-  }
-
-  // Save the file to the system.
-  if (file_put_contents($filename, $data) === FALSE) {
-    watchdog('static', 'Could not create the file %file on your system', array('%file' => $filename), WATCHDOG_ERROR);
-    return FALSE;
-  }
-
-  // Chmod file so webserver can send it out.
-  drupal_chmod($filename, $chmod);
-  return TRUE;
-}
-
-/**
- * Create a directory.
- */
-function static_mkdir($directory) {
-  global $_static;
-
-  // Only do something if it's not a dir.
-  if (!is_dir($directory)) {
-    if (!static_in_cache_dir($directory)) {
-      return FALSE;
-    }
-
-    // Try to create the directory.
-    $mode = variable_get('file_chmod_directory', 0775);
-    if (!mkdir($directory, $mode, TRUE)) {
-      watchdog('static', 'Could not create the directory %dir on your system', array('%dir' => $directory), WATCHDOG_ERROR);
-      return FALSE;
-    }
-    drupal_chmod($directory);
-  }
-  return TRUE;
-}
-
-/**
- * Returns the relative normal static dir. static/normal.
- */
-function static_get_normal_cache_dir() {
-  return variable_get('static_root_cache_dir', STATIC_ROOT_CACHE_DIR) . '/' . variable_get('static_normal_dir', STATIC_NORMAL_DIR);
-}
-
-/**
- * Verify that the operation is going to operate in the cache dir.
- */
-function static_in_cache_dir($file) {
-  global $_static;
-
-  $good = TRUE;
-  $real_file = realpath($file);
-  $cache_dir = variable_get('static_root_cache_dir', STATIC_ROOT_CACHE_DIR);
-  $real_cache_dir = realpath($cache_dir);
-
-  // Only operate in the cache dir.
-  // Check the real path.
-  if (strpos($file, $cache_dir) !== 0
-      || ($real_file && $real_cache_dir && strpos($real_file, $real_cache_dir) !== 0)
-        ) {
-    $good = FALSE;
-  }
-
-  // Send error to watchdog.
-  if (!$good) {
-    watchdog('static', 'An operation outside of the cache directory was attempted on your system. %file or %real_file is outside the cache directory %cache or %real_cache.', array(
-      '%file'       => $file,
-      '%real_file'  => $real_file,
-      '%cache'      => $cache_dir,
-      '%real_cache' => $real_cache_dir,
-      ),
-    WATCHDOG_CRITICAL);
-  }
-
-  return $good;
-}
-
-/**
  * Set all pages to be regenerated.
  */
 function static_regenerate() {
@@ -590,22 +541,6 @@ function static_clear() {
   static_requirements('runtime');
 
   return TRUE;
-}
-
-/**
- * Delete directory and everything under it.
- */
-function static_delete_dir($dir) {
-  $files = array_diff(scandir($dir), array('.', '..'));
-  foreach ($files as $file) {
-    if (is_link("$dir/$file") || is_file("$dir/$file")) {
-      drupal_unlink("$dir/$file");
-    }
-    elseif (is_dir("$dir/$file")) {
-      static_delete_dir("$dir/$file");
-    }
-  }
-  return drupal_rmdir($dir);
 }
 
 /**
@@ -698,51 +633,6 @@ function _static_batch_generating_callback($batch_size, &$context) {
 }
 
 /**
- * Refresh all known paths for the static module.
- */
-function static_refresh_paths() {
-  // On larger sites this might run into php limit issues (memory and time).
-  $paths = module_invoke_all('static_refresh_paths');
-
-  drupal_alter('static_refresh_paths', $paths);
-
-  static_track_paths($paths);
-}
-
-/**
- * Implements hook_static_refresh_paths().
- *
- * Return info about system paths.
- */
-function static_static_refresh_paths() {
-  $paths = array();
-  $paths[''] = array(
-    'path' => '<front>',
-    'dynamic' => 1,
-  );
-  $paths['node'] = array(
-    'path' => 'node',
-    'pager' => 'page',
-    'dynamic' => 1,
-  );
-  $site_404 = variable_get('site_404', '');
-  if ($site_404 != '') {
-    $paths[$site_404] = array(
-      'type' => 'system',
-      'path' => $site_404,
-    );
-  }
-  $site_403 = variable_get('site_403', '');
-  if ($site_403 != '') {
-    $paths[$site_403] = array(
-      'type' => 'system',
-      'path' => $site_403,
-    );
-  }
-  return $paths;
-}
-
-/**
  * Implements hook_preprocess_HOOK().
  */
 function static_preprocess_pager(&$variables) {
@@ -774,20 +664,9 @@ function static_preprocess_pager(&$variables) {
 }
 
 /**
- * Get the current status of the static generator.
- */
-function static_get_status() {
-  $query = db_select('static', 's')
-      ->fields('s', array('status'));
-  $query->addExpression('count(id)', 'count');
-  $results = $query->groupBy('status')
-      ->execute()
-      ->fetchAll();
-  return $results;
-}
-
-/**
  * Implements hook_page_build().
+ *
+ * Add the static link and status on the bottom right of all pages for admins.
  */
 function static_page_build(&$page) {
   if (!user_access('pubish static site') || !variable_get('static_button', TRUE)) {
