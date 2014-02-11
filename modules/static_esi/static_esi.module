@@ -1,7 +1,8 @@
 <?php
 
-/* 
- * Tell static about all esi links..'
+/**
+ * @file
+ * Tell static about all esi links.
  */
 
 /**
@@ -28,7 +29,7 @@ function static_esi_esi_block_url_alter(&$url) {
   static_track_paths(
     array(
       array(
-        'path' => $url, 
+        'path' => $url,
         'dynamic' => 1,
       )
     )
@@ -49,7 +50,7 @@ function static_esi_esi_context_url_alter($url) {
   static_track_paths(
     array(
       array(
-        'path' => $url, 
+        'path' => $url,
         'dynamic' => 1,
       )
     )
@@ -81,7 +82,7 @@ function static_esi_static_refresh_paths() {
 // Perhaps just set them to refresh on cron every 15 minutes?
 
 /**
- * Implements hook_form_FORM_ID_alter
+ * Implements hook_form_FORM_ID_alter().
  */
 function static_esi_form_block_admin_configure_alter(&$form, $form_state) {
   $form['#submit'][] = 'static_esi_block_admin_configure_form_submit';

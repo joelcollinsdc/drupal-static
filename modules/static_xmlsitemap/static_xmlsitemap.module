@@ -1,6 +1,7 @@
 <?php
 
-/* 
+/**
+ * @file
  * Use the xmlsitemap link info to fill out a list of pages to be built.
  */
 
@@ -35,6 +36,6 @@ function static_xmlsitemap_static_refresh_paths() {
       ->condition('status', 1)
       ->condition('loc', '\%', 'NOT LIKE')
       ->execute()
-      ->fetchAllKeyed(0,0);
+      ->fetchAllKeyed(0, 0);
   return $results;
 }
