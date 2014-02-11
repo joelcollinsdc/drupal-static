@@ -215,7 +215,7 @@ function static_admin_confirm(array $form, array &$form_state, $action) {
     ),
   );
   $desc = "<h3>{$text[1]}</h3><p>{$text[2]}</p>";
-  return confirm_form($form, check_plain($text[0]), "admin/config/system/static", check_plain($desc));
+  return confirm_form($form, filter_xss($text[0]), "admin/config/system/static", filter_xss($desc));
 }
 
 /**
