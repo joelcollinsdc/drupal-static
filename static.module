@@ -571,7 +571,7 @@ function static_clear() {
  */
 function _static_batch_generating_create($batch_size) {
   if (!static_lock_acquire()) {
-    drupal_set_message(t('Unable to acquire lock. Generation may already be running or syncronization is in process. Please try again in a few minutes.', 'warning'));
+    drupal_set_message(t('Unable to acquire lock. Generation may already be running or syncronization is in process. Please try again in a few minutes.'), 'warning');
     return FALSE;
   }
   $remaining = $batch_size;
