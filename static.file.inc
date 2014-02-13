@@ -41,7 +41,7 @@ function static_redirect_page($oldfile, $newfile) {
  * time.
  */
 function static_lock_acquire() {
-  $file = static_get_normal_cache_dir() . '/static.lock';
+  $file = static_get_normal_cache_dir() . '/.static.lock';
   if (!file_exists($file)) {
     static_write_file($file, '');
     return TRUE;
@@ -53,7 +53,7 @@ function static_lock_acquire() {
  * Remove the lock file to indicate generation is complete.
  */
 function static_lock_release() {
-  drupal_unlink(static_get_normal_cache_dir() . '/static.lock');
+  drupal_unlink(static_get_normal_cache_dir() . '/.static.lock');
 }
 
 /**
