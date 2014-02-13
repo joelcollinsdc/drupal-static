@@ -340,12 +340,27 @@ function static_cron() {
  */
 function static_cron_queue_info() {
   $queues['static'] = array(
-    'worker callback' => 'static_generate_file',
+    'worker callback' => 'static_cron_generate_file',
     // Max run time to claim per cron run (in seconds).
     'time' => variable_get('static_queue_seconds', 30),
   );
 
   return $queues;
+}
+
+/**
+ * Generate a static html file callback for cron.
+ * 
+ * We need an extra layer since we need to set the lock file during cron.
+ * Unfortunately there is no easy way of doing this or blocking during the
+ * entire cron run. See: drupal_cron_run().
+ */
+function static_cron_generate_file($path) {
+  if (static_lock_acquire()) {
+    $return = static_generate_file($path);
+    static_lock_release();
+  }
+  return $return;
 }
 
 /**
@@ -407,7 +422,7 @@ function static_generate_file($path) {
     static_copy_linked_files($data);
 
     // Set to 755 so ssi can include.
-    static_write_file(static_get_normal_cache_dir() . '/' . $info['file'], $data, 0755);
+    $result = static_write_file(static_get_normal_cache_dir() . '/' . $info['file'], $data, 0755);
   }
 
   else {
@@ -418,9 +433,12 @@ function static_generate_file($path) {
     }
     $info['status'] = STATIC_ERROR;
     static_save_info($info);
+    
+    $result = FALSE;
   }
-
+  
   watchdog('static', 'Statically generated !file', array('!file' => $info['file']), WATCHDOG_DEBUG);
+  return $result;
 }
 
 /**
@@ -507,9 +525,14 @@ function static_generate_files($limit) {
       ->execute()
       ->fetchAllAssoc('id');
 
+  $count = 0;
   foreach ($results as $id => $result) {
-    static_generate_file($result->path);
+    $success = static_generate_file($result->path);
+    if ($success) {
+      $count++;
+    }
   }
+  return $count;
 }
 
 /**
@@ -547,6 +570,10 @@ function static_clear() {
  * Creates and sets a batch for generating items.
  */
 function _static_batch_generating_create($batch_size) {
+  if (!static_lock_acquire()) {
+    drupal_set_message(t('Unable to acquire lock. Generation may already be running or syncronization is in process. Please try again in a few minutes.', 'warning'));
+    return FALSE;
+  }
   $remaining = $batch_size;
   if ($batch_size !== 0) {
     if ($batch_size < 0) {
@@ -564,6 +591,7 @@ function _static_batch_generating_create($batch_size) {
     batch_set($batch);
     return TRUE;
   }
+  drupal_set_message(t("Couldn't create a batch, please check the batch size."), 'warning');
   return FALSE;
 }
 
@@ -575,7 +603,7 @@ function _static_batch_generating_callback($batch_size, &$context) {
   if (!isset($context['sandbox']['batch_size'])) {
     $context['sandbox']['batch_size'] = $batch_size;
     $context['sandbox']['progress'] = 0;
-    $context['sandbox']['start'] = time();
+    $context['results']['start'] = time();
   }
 
   $query = db_select('static', 's');
@@ -622,13 +650,34 @@ function _static_batch_generating_callback($batch_size, &$context) {
 
   // Everything has been generated.
   if ($generated === 0 || $context['sandbox']['progress'] >= $context['sandbox']['limit']) {
-    $total_time = time() - $context['sandbox']['start'];
-    $message = 'Generated ' . format_plural($context['sandbox']['progress'], '1 page', '@pages pages', array('@pages' => $context['sandbox']['progress'])) . ' in ' . $total_time . ' seconds. (' . round($context['sandbox']['progress'] / $total_time, 2) . ' pages per second)';
-    drupal_set_message(check_plain($message));
     $context['finished'] = 1;
   }
   else {
     $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['limit'];
+  }
+}
+
+/**
+ * Batch API finishing callback for the generating functionality.
+ */
+function _static_batch_generating_finished($success, $results) {
+  static_lock_release();
+  // Display result messages.
+  if ($success) {
+    if (!empty($results['generated'])) {
+      $total_time = time() - $results['start'];
+      drupal_set_message(format_plural($results['generated'], 'Successfully generated 1 page', 'Successfully generated @pages pages', array('@pages' => $results['generated'])) . ' in ' . $total_time . ' seconds. (' . round($results['generated'] / $total_time, 2) . ' pages per second)');
+
+      if (!empty($results['not generated'])) {
+       drupal_set_message(format_plural($results['not generated'], '1 page could not be generated. Check the logs for details.', '@count pages could not be generated. Check the logs for details.'), 'warning');
+      }
+    }
+    else {
+      drupal_set_message(t("Couldn't generate pages. Check the logs for details."), 'error');
+    }
+  }
+  else {
+    drupal_set_message(t("An error occurred while trying to generate pages. Check the logs for details."), 'error');
   }
 }
 

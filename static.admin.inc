@@ -163,9 +163,7 @@ function static_admin_status_submit(array $form, array &$form_state) {
   switch ($values['op']) {
     case t('Publish now'):
       static_expire_dynamic();
-      if (!_static_batch_generating_create(variable_get('static_batch_size', STATIC_DEFAULT_CRON_LIMIT))) {
-        drupal_set_message(t("Couldn't create a batch, please check the batch size."), 'warning');
-      }
+      _static_batch_generating_create(variable_get('static_batch_size', STATIC_DEFAULT_CRON_LIMIT));
       break;
 
     case t('Queue all items for regeneration'):
