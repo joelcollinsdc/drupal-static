@@ -135,7 +135,7 @@ function static_requirements($phase) {
     if (empty($requirements)) {
       $requirements['static'] = array(
         'title'       => $t('Static'),
-        'severity'    => REQUIREMENT_OK,
+        'severity'    => 0,
         'value'       => $t('Static installed correctly, should be working if properly <a href="@settings">configured</a>.', array('@settings' => url('admin/config/system/static'))),
       );
     }

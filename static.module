@@ -480,39 +480,43 @@ function static_copy_linked_files($data, $source_dir = '') {
   $matches = array();
   // Match include("/anything").
   $includes = array();
-  preg_match_all('/include\(["\']\/([^"]*)["\']\)/i', $data, $includes);
+  preg_match_all('/include\(["\'][\/\.]([^"\']*)["\']\)/', $data, $includes);
   if (isset($includes[1])) {
     $matches += $includes[1];
   }
-  // Match @import url("/anything").
+  // Match url("/anything").
   $imports = array();
-  preg_match_all('/@import\s+url\(["\']\/([^"]*)["\']\)/i', $data, $imports);
+  preg_match_all('/url\(["\'][\/\.]([^"\']*)["\']\)/', $data, $imports);
   if (isset($imports[1])) {
     $matches = array_merge($matches, $imports[1]);
   }
   // Match src="/{anything}".
   $srcs = array();
-  preg_match_all('/src=["\']\/([^"]*)["\']/i', $data, $srcs);
+  preg_match_all('/src=["\'][\/\.]([^"\']*)["\']/i', $data, $srcs);
   if (isset($srcs[1])) {
     $matches = array_merge($matches, $srcs[1]);
   }
   // Match href="/{anything}.{ico|css|pdf|doc}(?{anything})" () querystring is
   // optional.
   $hrefs = array();
-  preg_match_all('/href="\/([^"]*.\.(' . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ')(\?[^"]*.)?)"/i', $data, $hrefs);
+  preg_match_all('/href="[\/\.]([^"]*.\.(' . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ')(\?[^"]*.)?)"/i', $data, $hrefs);
   if (isset($hrefs[1])) {
     $matches = array_merge($matches, $hrefs[1]);
   }
   // Match href='/{anything}.{ico|css|pdf|doc}(?{anything})' () querystring is
   // optional.
   $hrefs = array();
-  preg_match_all("/href='\/([^']*.\.(" . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ")(\?[^']*.)?)'/i", $data, $hrefs);
+  preg_match_all("/href='[/.]([^']*.\.(" . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ")(\?[^']*.)?)'/i", $data, $hrefs);
   if (isset($hrefs[1])) {
     $matches = array_merge($matches, $hrefs[1]);
   }
   foreach ($matches as $match) {
     // Strip off the querystring.
     $cleanfile = preg_replace('/\?.*/', '', $match);
+    // If path is relative, add on source base.
+    if (strpos($cleanfile, '.') === 0) {
+      $cleanfile = $source_dir . '/.' . $cleanfile;
+    }
     // Don't copy if the file already exists.
     if (!file_exists(static_get_normal_cache_dir() . '/' . $cleanfile)) {
       // Make sure the destination exists.
@@ -533,6 +537,11 @@ function static_copy_linked_files($data, $source_dir = '') {
         }
       }
       else {
+        // Process contents of css and js files as they could contain other linked data.
+        if (substr($cleanfile, -strlen('.css')) === '.css' || substr($cleanfile, -strlen('.js')) === '.js') {
+          $contents = file_get_contents($cleanfile);
+          static_copy_linked_files($contents, dirname($cleanfile));
+        }
         copy($cleanfile, static_get_normal_cache_dir() . '/' . $cleanfile);
       }
     }
