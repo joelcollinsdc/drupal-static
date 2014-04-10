@@ -40,11 +40,18 @@ function static_schema() {
         'default' => '',
       ),
       'status' => array(
-        'description' => 'An integer that represents if the item is included in the sitemap.',
+        'description' => 'An integer that represents result of the fetch query.',
         'type' => 'int',
-        'size' => 'small',
+        'size' => 'normal',
         'not null' => TRUE,
-        'default' => 1,
+        'default' => 0,
+      ),
+      'status_message' => array(
+        'description' => 'The message from the fetch query.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
       ),
       'dynamic' => array(
         'description' => 'Whether this page contains dynamic content. This is used to determine if this should be regenerated on a schedule (cron).',
@@ -141,4 +148,27 @@ function static_requirements($phase) {
  */
 function static_create_htaccess($cache_directory) {
   return copy(drupal_get_path('module', 'static') . '/static.htaccess', $cache_directory . '/.htaccess');
+}
+
+/**
+ * Change the status fields to match responses.
+ */
+function static_update_7000() {
+  db_change_field('static', 'status', 'status', array(
+    'description' => 'An integer that represents result of the fetch query.',
+    'type' => 'int',
+    'size' => 'normal',
+    'not null' => TRUE,
+    'default' => 0,
+  ));
+  db_add_field('static', 'status_message', array(
+    'description' => 'The message from the fetch query.',
+    'type' => 'varchar',
+    'length' => 255,
+    'not null' => TRUE,
+    'default' => '',
+  ));
+  db_update('static')
+    ->fields(array('status' => 0))
+    ->execute();
 }

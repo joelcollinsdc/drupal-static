@@ -80,18 +80,9 @@ function static_admin_settings() {
  * Page callback for static status.
  */
 function static_admin_status() {
-  $status = array(
-    STATIC_EXPIRED => 0,
-    STATIC_CURRENT => 0,
-    STATIC_ERROR => 0,
-    'total' => 0,
-  );
-  $results = static_get_status();
+  $total = 0;
 
-  foreach ($results as $result) {
-    $status[$result->status] += $result->count;
-    $status['total'] += $result->count;
-  }
+  $results = static_get_status();
 
   $form['status'] = array(
     '#type' => 'fieldset',
@@ -99,26 +90,27 @@ function static_admin_status() {
     '#title' => t('Status'),
   );
 
-  $form['status']['current'] = array(
-    '#markup' => t('@current items generated and up to date.', array('@current' => $status[STATIC_CURRENT])),
-    '#prefix' => '<div>',
-    '#suffix' => '</div>',
-  );
+  foreach ($results as $result) {
+    if ($result->status == STATIC_EXPIRED) {
+      $form['status']['result_' . $result->status] = array(
+        '#markup' => t('@count items need publishing.', array('@count' => $result->count, '!status' => $result->status)),
+        '#prefix' => '<div>',
+        '#suffix' => '</div>',
+      );
+    }
+    else {
+      $form['status']['result_' . $result->status] = array(
+        '#markup' => t('@count items returned !status.', array('@count' => $result->count, '!status' => $result->status)),
+        '#prefix' => '<div>',
+        '#suffix' => '</div>',
+      );
+    }
 
-  $form['status']['expired'] = array(
-    '#markup' => t('@expired items need generation.', array('@expired' => $status[STATIC_EXPIRED])),
-    '#prefix' => '<div>',
-    '#suffix' => '</div>',
-  );
-
-  $form['status']['error'] = array(
-    '#markup' => t('@error items did not generate properly.', array('@error' => $status[STATIC_ERROR])),
-    '#prefix' => '<div>',
-    '#suffix' => '</div>',
-  );
+    $total += $result->count;
+  }
 
   $form['status']['total'] = array(
-    '#markup' => t('@total total items.', array('@total' => $status['total'])),
+    '#markup' => t('@total total items.', array('@total' => $total)),
     '#prefix' => '<div>',
     '#suffix' => '</div>',
   );
@@ -129,19 +121,15 @@ function static_admin_status() {
     '#title' => t('Actions'),
   );
 
-  if ($status[STATIC_EXPIRED] > 0) {
-    $form['actions']['generate'] = array(
-      '#type' => 'submit',
-      '#value' => t('Publish now'),
-    );
-  }
+  $form['actions']['generate'] = array(
+    '#type' => 'submit',
+    '#value' => t('Publish now'),
+  );
 
-  if ($status[STATIC_CURRENT] > 0 || $status[STATIC_ERROR] > 0) {
-    $form['actions']['regenerate'] = array(
-      '#type' => 'submit',
-      '#value' => t('Queue all items for regeneration'),
-    );
-  }
+  $form['actions']['regenerate'] = array(
+    '#type' => 'submit',
+    '#value' => t('Queue all items for regeneration'),
+  );
 
   $form['actions']['clear'] = array(
     '#type' => 'submit',
@@ -285,15 +273,18 @@ function static_admin_paths() {
     '#attributes' => array('class' => array('filters')),
   );
 
+  $options = db_select('static', 's')
+    ->fields('s', array('status'))
+    ->distinct()
+    ->execute()
+    ->fetchAllKeyed(0,0);
+
+  $options = array('' => 'any') + $options;
+
   $form['filters']['filters']['status'] = array(
     '#type' => 'select',
     '#title' => 'status',
-    '#options' => array(
-      '' => 'any',
-      STATIC_CURRENT => 'current',
-      STATIC_EXPIRED => 'needs generation',
-      STATIC_ERROR => 'error',
-    ),
+    '#options' => $options,
     '#default_value' => $session['status'],
   );
 
@@ -353,6 +344,7 @@ function static_admin_paths() {
     'file' => array('data' => t('Generated File'), 'field' => 's.file'),
     'dynamic' => array('data' => t('Dynamic Page'), 'field' => 's.dynamic'),
     'status' => array('data' => t('Status'), 'field' => 's.status'),
+    'status_message' => array('data' => t('Message')),
     'updated' => array(
       'data' => t('Updated'),
       'field' => 's.updated',
@@ -392,7 +384,8 @@ function static_admin_paths() {
       'alias' => check_plain($info->alias),
       'file' => check_plain($info->file),
       'dynamic' => ($info->dynamic ? 'Yes' : 'No'),
-      'status' => ($info->status ? ($info->status == 2 ? t('error') : t('current')) : t('needs generation')),
+      'status' => $info->status,
+      'status_message' => $info->status_message,
       'updated' => format_date($info->updated, 'short'),
     );
   }

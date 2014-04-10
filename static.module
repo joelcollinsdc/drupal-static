@@ -11,16 +11,6 @@
 define('STATIC_EXPIRED', 0);
 
 /**
- * Value for current content
- */
-define('STATIC_CURRENT', 1);
-
-/**
- * Value for error content
- */
-define('STATIC_ERROR', 2);
-
-/**
  * Default value for the root cache dir.
  */
 define('STATIC_ROOT_CACHE_DIR', 'static');
@@ -264,6 +254,7 @@ function static_get_status() {
   $query = db_select('static', 's')
       ->fields('s', array('status'));
   $query->addExpression('count(id)', 'count');
+  $query->orderBy('status', 'ASC');
   $results = $query->groupBy('status')
       ->execute()
       ->fetchAll();
@@ -373,6 +364,9 @@ function static_cron_generate_file($path) {
  */
 function static_generate_file($path) {
   global $base_url;
+
+  $time = -microtime(true);
+  
   $info = static_get_info($path);
   // If status is 1, we don't want to regenerate again. Only regenerated
   // status 0. This can happen when items get left in the queue and are there
@@ -398,8 +392,9 @@ function static_generate_file($path) {
 
     $info['file'] = $newfile;
 
-    $info['status'] = STATIC_CURRENT;
     $info['updated'] = REQUEST_TIME;
+    $info['status'] = $request[$absolute_url]->code;
+    $info['status_message'] = $request[$absolute_url]->status_message;
 
     static_save_info($info);
 
@@ -423,6 +418,10 @@ function static_generate_file($path) {
 
     // Set to 755 so ssi can include.
     $result = static_write_file(static_get_normal_cache_dir() . '/' . $info['file'], $data, 0755);
+
+    $time += microtime(true);
+
+    watchdog('static', 'Statically generated !file in !time seconds.', array('!file' => $info['file'], '!time' => $time), WATCHDOG_INFO);
   }
 
   else {
@@ -431,13 +430,15 @@ function static_generate_file($path) {
     if ($request[$absolute_url]->code == 404 && $info['file']) {
       @unlink(static_get_normal_cache_dir() . '/' . $info['file']);
     }
-    $info['status'] = STATIC_ERROR;
+    $info['status'] = $request[$absolute_url]->code;
+    $info['status_message'] = $request[$absolute_url]->status_message;
     static_save_info($info);
     
+    $time += microtime(true);
+
+    watchdog('static', 'Generation failed for !file with status !status in !time seconds.', array('!file' => $info['file'], '!time' => $time, '!status' => $request[$absolute_url]->code), WATCHDOG_INFO);
     $result = FALSE;
   }
-  
-  watchdog('static', 'Statically generated !file', array('!file' => $info['file']), WATCHDOG_DEBUG);
   return $result;
 }
 
@@ -471,19 +472,44 @@ function static_filename($info) {
 /**
  * Find any linked files within the page and copy them over to the destination.
  */
-function static_copy_linked_files($data) {
+function static_copy_linked_files($data, $source_dir = '') {
   // Should find a way of caching the results so we aren't constantly
   // checking common files.
   $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
   $files_dir = $wrapper->getDirectoryPath();
-  $srcs = array();
+  $matches = array();
+  // Match include("/anything").
+  $includes = array();
+  preg_match_all('/include\(["\']\/([^"]*)["\']\)/i', $data, $includes);
+  if (isset($includes[1])) {
+    $matches += $includes[1];
+  }
+  // Match @import url("/anything").
+  $imports = array();
+  preg_match_all('/@import\s+url\(["\']\/([^"]*)["\']\)/i', $data, $imports);
+  if (isset($imports[1])) {
+    $matches = array_merge($matches, $imports[1]);
+  }
   // Match src="/{anything}".
-  preg_match_all('/src="\/([^"]*)"/i', $data, $srcs);
-  $hrefs = array();
+  $srcs = array();
+  preg_match_all('/src=["\']\/([^"]*)["\']/i', $data, $srcs);
+  if (isset($srcs[1])) {
+    $matches = array_merge($matches, $srcs[1]);
+  }
   // Match href="/{anything}.{ico|css|pdf|doc}(?{anything})" () querystring is
   // optional.
+  $hrefs = array();
   preg_match_all('/href="\/([^"]*.\.(' . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ')(\?[^"]*.)?)"/i', $data, $hrefs);
-  $matches = array_merge($srcs[1], $hrefs[1]);
+  if (isset($hrefs[1])) {
+    $matches = array_merge($matches, $hrefs[1]);
+  }
+  // Match href='/{anything}.{ico|css|pdf|doc}(?{anything})' () querystring is
+  // optional.
+  $hrefs = array();
+  preg_match_all("/href='\/([^']*.\.(" . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ")(\?[^']*.)?)'/i", $data, $hrefs);
+  if (isset($hrefs[1])) {
+    $matches = array_merge($matches, $hrefs[1]);
+  }
   foreach ($matches as $match) {
     // Strip off the querystring.
     $cleanfile = preg_replace('/\?.*/', '', $match);
@@ -723,14 +749,12 @@ function static_page_build(&$page) {
   }
   $status = array(
     STATIC_EXPIRED => 0,
-    STATIC_CURRENT => 0,
-    STATIC_ERROR => 0,
     'total' => 0,
   );
   $results = static_get_status();
 
   foreach ($results as $result) {
-    $status[$result->status] += $result->count;
+    $status[$result->status] = $result->count;
     $status['total'] += $result->count;
   }
   drupal_add_js(array('static' => $status), 'setting');
