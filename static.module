@@ -473,6 +473,7 @@ function static_filename($info) {
  * Find any linked files within the page and copy them over to the destination.
  */
 function static_copy_linked_files($data, $source_dir = '') {
+  module_invoke_all('static_process', $data, $source_dir);
   // Should find a way of caching the results so we aren't constantly
   // checking common files.
   $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
