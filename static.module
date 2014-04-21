@@ -734,7 +734,7 @@ function static_preprocess_pager(&$variables) {
     $user = drupal_anonymous_user();
     $menu_item = menu_get_item($path);
     // Can't use $menu_item['access'] directly since it was cached.
-    _menu_check_access($menu_item, $menu_item['original_map']);
+    _menu_check_access($menu_item, $menu_item['map']);
     $user = $current_user;
 
     if ($menu_item['access']) {
