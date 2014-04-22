@@ -376,7 +376,7 @@ function static_generate_file($path) {
   }
   $absolute_url = urldecode(url($info['alias'], array('absolute' => TRUE, 'alias' => TRUE)));
 
-  httprl_request($absolute_url);
+  httprl_request($absolute_url, array('headers' => array('User-Agent' => 'Drupal Static (+http://drupal.org/project/static)')));
   $request = httprl_send_request();
 
   if ($request[$absolute_url]->code == 200) {
