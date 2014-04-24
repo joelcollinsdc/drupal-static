@@ -191,6 +191,8 @@ function static_static_refresh_paths() {
  * Load a static path info.
  */
 function static_get_info($path) {
+  $path_alias = array();
+
   // Special case for the front page since it is weird.
   if ($path == '' || $path == '<front>') {
     $path_alias = array(
@@ -199,15 +201,33 @@ function static_get_info($path) {
     );
   }
   else {
-    // Ensure this is the normal path.
-    $path = drupal_get_normal_path($path);
+    // Split path into parts for path, query, fragment.
+    $path_parts = drupal_parse_url($path);
 
-    $path_alias = path_load(array('source' => drupal_get_normal_path($path)));
+    // Process aliases for the path portion.
+    if (isset($path_parts['path'])) {
+      // Ensure this is the normal path.
+      $source_path = drupal_get_normal_path($path_parts['path']);
+      $path_alias = path_load(array('source' => $source_path));
 
-    if (!$path_alias) {
+      // Build the paths with the original options for query, fragment.
+      $url_options = array('alias' => TRUE) + $path_parts;
+      unset($url_options['path']);
+      foreach (array('source', 'alias')  as $path_key) {
+        if (isset($path_alias[$path_key])) {
+          $path_alias[$path_key] = url($path_alias[$path_key], $url_options);
+          $path_alias[$path_key] = ltrim($path_alias[$path_key], '/');
+        }
+      }
+    }
+    else {
+      $source_path = drupal_get_normal_path($source_path);
+    }
+
+    if (empty($path_alias)) {
       $path_alias = array(
-        'source' => $path,
-        'alias' => $path,
+        'source' => $source_path,
+        'alias' => $source_path,
       );
     }
   }
@@ -402,8 +422,10 @@ function static_generate_file($path) {
       $pager_total = intval($info['pager_total']);
       for ($i = 1; $i < $pager_total; $i++) {
         $pager_path = $info['path'] . '?' . $info['pager'] . '=' . $i;
+        $pager_alias = $info['alias'] . '?' . $info['pager'] . '=' . $i;
         $pager_paths[$pager_path] = array(
           'path' => $pager_path,
+          'alias' => $pager_alias,
           'dynamic' => 1,
         );
       }
