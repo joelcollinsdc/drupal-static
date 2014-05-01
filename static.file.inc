@@ -90,7 +90,7 @@ function static_mkdir($directory) {
     }
 
     // Try to create the directory.
-    $mode = variable_get('file_chmod_directory', 0775);
+    $mode = variable_get('file_chmod_directory', 0777);
     if (!mkdir($directory, $mode, TRUE)) {
       watchdog('static', 'Could not create the directory %dir on your system', array('%dir' => $directory), WATCHDOG_ERROR);
       return FALSE;
