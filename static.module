@@ -361,7 +361,7 @@ function static_cron_queue_info() {
 
 /**
  * Generate a static html file callback for cron.
- * 
+ *
  * We need an extra layer since we need to set the lock file during cron.
  * Unfortunately there is no easy way of doing this or blocking during the
  * entire cron run. See: drupal_cron_run().
@@ -386,7 +386,7 @@ function static_generate_file($path) {
   global $base_url;
 
   $time = -microtime(true);
-  
+
   $info = static_get_info($path);
   // If status is 1, we don't want to regenerate again. Only regenerated
   // status 0. This can happen when items get left in the queue and are there
@@ -441,9 +441,16 @@ function static_generate_file($path) {
     // Set to 755 so ssi can include.
     $result = static_write_file(static_get_normal_cache_dir() . '/' . $info['file'], $data, 0755);
 
-    $time += microtime(true);
-
-    watchdog('static', 'Statically generated !file in !time seconds.', array('!file' => $info['file'], '!time' => $time), WATCHDOG_INFO);
+    if (!$result) {
+      $info['status'] = 500;
+      $info['status_message'] = 'Failed to write file.';
+      static_save_info($info);
+      watchdog('static', 'Failed to write file !file', array('!file' => $info['file']), WATCHDOG_ERROR);
+    }
+    else {
+      $time += microtime(true);
+      watchdog('static', 'Statically generated !file in !time seconds.', array('!file' => $info['file'], '!time' => $time), WATCHDOG_INFO);
+    }
   }
 
   else {
@@ -455,7 +462,7 @@ function static_generate_file($path) {
     $info['status'] = $request[$absolute_url]->code;
     $info['status_message'] = $request[$absolute_url]->status_message;
     static_save_info($info);
-    
+
     $time += microtime(true);
 
     watchdog('static', 'Generation failed for !file with status !status in !time seconds.', array('!file' => $info['file'], '!time' => $time, '!status' => $request[$absolute_url]->code), WATCHDOG_INFO);
