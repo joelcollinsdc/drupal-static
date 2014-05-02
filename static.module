@@ -399,6 +399,9 @@ function static_generate_file($path) {
   httprl_request($absolute_url, array('headers' => array('User-Agent' => 'Drupal Static (+http://drupal.org/project/static)')));
   $request = httprl_send_request();
 
+  // Allow other modules to modify the response.
+  drupal_alter('static_response', $info, $request);
+
   if ($request[$absolute_url]->code == 200) {
     // Reload the static info as it may have changed during the request.
     // If the page has a pager it will have changed.
