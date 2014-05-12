@@ -543,6 +543,7 @@ function static_copy_linked_files($data, $source_dir = '') {
   if (isset($hrefs[1])) {
     $matches = array_merge($matches, $hrefs[1]);
   }
+  $files = array();
   foreach ($matches as $match) {
     // Strip off the querystring.
     $cleanfile = preg_replace('/\?.*/', '', $match);
@@ -550,35 +551,10 @@ function static_copy_linked_files($data, $source_dir = '') {
     if (strpos($cleanfile, '.') === 0) {
       $cleanfile = $source_dir . '/.' . $cleanfile;
     }
-    // Don't copy if the file already exists.
-    if (!file_exists(static_get_normal_cache_dir() . '/' . $cleanfile)) {
-      // Make sure the destination exists.
-      $directory = dirname(static_get_normal_cache_dir() . '/' . $cleanfile);
-      if (!static_mkdir($directory)) {
-        return FALSE;
-      }
-      // Special case for image styles. We can't directly copy if they haven't
-      // been generated yet.
-      if (strpos($match, $files_dir . '/styles') === 0 && !file_exists(static_get_normal_cache_dir() . '/' . $cleanfile)) {
-        // Should optimize this for multithreaded gets.
-        $absolute_url = urldecode(url($match, array('absolute' => TRUE, 'alias' => TRUE)));
-        httprl_request($absolute_url);
-        $request = httprl_send_request();
-
-        if ($request[$absolute_url]->code == 200) {
-          static_write_file(static_get_normal_cache_dir() . '/' . $cleanfile, $request[$absolute_url]->data, 0644);
-        }
-      }
-      else {
-        // Process contents of css and js files as they could contain other linked data.
-        if (substr($cleanfile, -strlen('.css')) === '.css' || substr($cleanfile, -strlen('.js')) === '.js') {
-          $contents = file_get_contents($cleanfile);
-          static_copy_linked_files($contents, dirname($cleanfile));
-        }
-        copy($cleanfile, static_get_normal_cache_dir() . '/' . $cleanfile);
-      }
-    }
+    $files[] = $cleanfile;
   }
+
+  static_copy_files($files);
 }
 
 /**

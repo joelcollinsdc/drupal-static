@@ -8,6 +8,72 @@
  */
 
 /**
+ * Copy a file from drupal to static.
+ */
+function static_copy_files($files) {
+  $copy_files = array();
+
+  foreach($files as $file) {
+    // Check if the file needs to be copied over.
+    if (static_check_file(static_get_normal_cache_dir() . '/' . $file)) {
+      // Make sure the destination exists.
+      $directory = dirname(static_get_normal_cache_dir() . '/' . $file);
+      if (!static_mkdir($directory)) {
+        return FALSE;
+      }
+      // Special case for image styles. We can't directly copy if they haven't
+      // been generated yet.
+      if (strpos($match, $files_dir . '/styles') === 0 && !file_exists(static_get_normal_cache_dir() . '/' . $file)) {
+        // Should optimize this for multithreaded gets.
+        $absolute_url = urldecode(url($match, array('absolute' => TRUE, 'alias' => TRUE)));
+        httprl_request($absolute_url);
+        $request = httprl_send_request();
+
+        if ($request[$absolute_url]->code == 200) {
+          static_write_file(static_get_normal_cache_dir() . '/' . $file, $request[$absolute_url]->data, 0644);
+        }
+      }
+      else {
+        // Process contents of css and js files as they could contain other linked data.
+        if (substr($file, -strlen('.css')) === '.css' || substr($file, -strlen('.js')) === '.js') {
+          $contents = file_get_contents($file);
+          static_copy_linked_files($contents, dirname($file));
+        }
+        copy($file, static_get_normal_cache_dir() . '/' . $file);
+      }
+    }
+  }
+}
+
+/**
+ * Check to see if a file needs to be copied.
+ */
+function static_check_file($file) {
+  $static_checked_files = &drupal_static(__FUNCTION__);
+
+  // If it is set. We don't need to check again.
+  if (isset($static_checked_files[$file])) {
+    return FALSE;
+  }
+
+  // If the file doesn't exists, we should try to copy it over.
+  if (!file_exists(static_get_normal_cache_dir() . '/' . $file)) {
+    return TRUE;
+  }
+
+  // Check to see if the file has changed.
+  // Note: md5 is slow on larger files. If the sites has many larger files we
+  // may need to consider something faster.
+  if (md5_file($file) != md5_file(static_get_normal_cache_dir() . '/' . $file)) {
+    return TRUE;
+  }
+
+  // At this point we know the file exists and is the same as drupal's version.
+  $static_checked_files[$file] = TRUE;
+  return FALSE;
+}
+
+/**
  * Create a redirect page.
  */
 function static_redirect_page($oldfile, $newfile) {
