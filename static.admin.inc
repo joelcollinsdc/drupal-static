@@ -82,6 +82,7 @@ function static_admin_settings() {
 function static_admin_status() {
   $total = 0;
 
+  $statuses = static_statuses();
   $results = static_get_status();
 
   $form['status'] = array(
@@ -99,8 +100,15 @@ function static_admin_status() {
       );
     }
     else {
+      if (isset($statuses[$result->status])) {
+        $status = $statuses[$result->status] . ' (' . $result->status . ')';
+      }
+      else {
+        $status = 'Unknown Status (' . $result->status . ')';
+      }
+      $status =
       $form['status']['result_' . $result->status] = array(
-        '#markup' => t('@count items returned !status.', array('@count' => $result->count, '!status' => $result->status)),
+        '#markup' => t('@count items returned !status.', array('@count' => $result->count, '!status' => $status)),
         '#prefix' => '<div>',
         '#suffix' => '</div>',
       );
@@ -273,11 +281,10 @@ function static_admin_paths() {
     '#attributes' => array('class' => array('filters')),
   );
 
-  $options = db_select('static', 's')
-    ->fields('s', array('status'))
-    ->distinct()
-    ->execute()
-    ->fetchAllKeyed(0,0);
+  $options = static_statuses();
+  foreach ($options as $key => $value) {
+    $options[$key] = '(' . $key . ') ' . $value;
+  }
 
   $options = array('' => 'any') + $options;
 

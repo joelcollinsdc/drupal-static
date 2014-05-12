@@ -803,3 +803,19 @@ function static_page_build(&$page) {
   drupal_add_js(drupal_get_path('module', 'static') . '/js/static.js', array('every_page' => TRUE));
   drupal_add_css($page['#attached']['css'][] = drupal_get_path('module', 'static') . '/css/static.css', array('every_page' => TRUE));
 }
+
+/**
+ * Return a list of possible statuses.
+ */
+function static_statuses() {
+  $statuses = array(
+    0 => 'Needs generation',
+    200 => 'Ok',
+    403 => 'Error - Forbidden',
+    404 => 'Error - Not Found',
+  );
+
+  drupal_alter('static_statuses', $statuses);
+
+  return $statuses;
+}
