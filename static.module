@@ -523,6 +523,13 @@ function static_copy_linked_files($data, $source_dir = '') {
   if (isset($imports[1])) {
     $matches = array_merge($matches, $imports[1]);
   }
+  $imports = array();
+  preg_match_all('/url\(([^"\'][^\/\.].*)\)/', $data, $imports);
+  if (isset($imports[1])) {
+    foreach ($imports[1] as $file) {
+      $matches[] = $source_dir . '/' . $file;
+    }
+  }
   // Match src="/{anything}".
   $srcs = array();
   preg_match_all('/src=["\'][\/\.]([^"\']*)["\']/i', $data, $srcs);
