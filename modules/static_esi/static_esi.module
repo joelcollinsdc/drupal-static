@@ -21,13 +21,6 @@ function static_esi_static_filename_alter(&$filename, $info) {
  * Implements hook_esi_block_url_alter().
  */
 function static_esi_esi_block_url_alter(&$url) {
-  // Since we don't have querystrings, roles or users on a static site,
-  // we don't need those parts in the url.
-  $parts = explode('/', $url);
-  unset($parts[3]);
-  unset($parts[4]);
-  unset($parts[5]);
-  $url = implode('/', $parts);
   static_track_paths(
     array(
       array(
@@ -42,13 +35,6 @@ function static_esi_esi_block_url_alter(&$url) {
  * Implements hook_context_block_url_alter().
  */
 function static_esi_esi_context_url_alter($url) {
-  // Since we don't have querystrings, roles or users on a static site,
-  // we don't need those parts in the url.
-  $parts = explode('/', $url);
-  unset($parts[3]);
-  unset($parts[4]);
-  unset($parts[5]);
-  $url = implode('/', $parts);
   static_track_paths(
     array(
       array(
