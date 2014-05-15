@@ -12,6 +12,8 @@
  */
 function static_copy_files($files) {
   $copy_files = array();
+  $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
+  $files_dir = $wrapper->getDirectoryPath();
 
   foreach($files as $file) {
     // Check if the file needs to be copied over.
@@ -23,7 +25,7 @@ function static_copy_files($files) {
       }
       // Special case for image styles. We can't directly copy if they haven't
       // been generated yet.
-      if (strpos($match, $files_dir . '/styles') === 0 && !file_exists(static_get_normal_cache_dir() . '/' . $file)) {
+      if (strpos($file, $files_dir . '/styles') === 0 && !file_exists(static_get_normal_cache_dir() . '/' . $file)) {
         // Should optimize this for multithreaded gets.
         $absolute_url = urldecode(url($match, array('absolute' => TRUE, 'alias' => TRUE)));
         httprl_request($absolute_url);
