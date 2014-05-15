@@ -518,17 +518,14 @@ function static_copy_linked_files($data, $source_dir = '') {
     $matches += $includes[1];
   }
   // Match url("/anything").
+  // Regex based on drupal_build_css_cache().
+  // - Finds css files for "@import url()".
+  // - Finds files within css files - url(images/button.png).
+  // - Excludes data based images.
   $imports = array();
-  preg_match_all('/url\(["\'][\/\.]([^"\']*)["\']\)/', $data, $imports);
+  preg_match_all('/url\(\s*[\'"]?(?!(?:data)+:)([^\'")]+)[\'"]?\s*\)/i', $data, $imports);
   if (isset($imports[1])) {
     $matches = array_merge($matches, $imports[1]);
-  }
-  $imports = array();
-  preg_match_all('/url\(([^"\'][^\/\.].*)\)/', $data, $imports);
-  if (isset($imports[1])) {
-    foreach ($imports[1] as $file) {
-      $matches[] = $source_dir . '/' . $file;
-    }
   }
   // Match src="/{anything}".
   $srcs = array();
@@ -539,28 +536,28 @@ function static_copy_linked_files($data, $source_dir = '') {
   // Match href="/{anything}.{ico|css|pdf|doc}(?{anything})" () querystring is
   // optional.
   $hrefs = array();
-  preg_match_all('/href="[\/\.]([^"]*.\.(' . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ')(\?[^"]*.)?)"/i', $data, $hrefs);
+  preg_match_all('/href="[\/\.]([^"]*\.(' . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ')(\?[^"]*)?)"/i', $data, $hrefs);
   if (isset($hrefs[1])) {
     $matches = array_merge($matches, $hrefs[1]);
   }
   // Match href='/{anything}.{ico|css|pdf|doc}(?{anything})' () querystring is
   // optional.
   $hrefs = array();
-  preg_match_all("/href='[/.]([^']*.\.(" . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ")(\?[^']*.)?)'/i", $data, $hrefs);
+  preg_match_all("/href=\'[\/\.]([^']*\.(" . variable_get('static_href_link_types', 'ico|css|pdf|doc') . ")(\?[^']*)?)\'/i", $data, $hrefs);
   if (isset($hrefs[1])) {
     $matches = array_merge($matches, $hrefs[1]);
   }
   $files = array();
+  $matches = array_unique($matches);
   foreach ($matches as $match) {
     // Strip off the querystring.
-    $cleanfile = preg_replace('/\?.*/', '', $match);
-    // If path is relative, add on source base.
-    if (strpos($cleanfile, '.') === 0) {
-      $cleanfile = $source_dir . '/.' . $cleanfile;
+    $cleanfile = static_clean_file_path($match, $source_dir);
+    if ($cleanfile) {
+      $files[] = $cleanfile;
     }
-    $files[] = $cleanfile;
   }
 
+  // Copy the files.
   static_copy_files($files);
 }
 
