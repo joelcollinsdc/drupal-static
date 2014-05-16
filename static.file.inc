@@ -12,8 +12,10 @@
  */
 function static_copy_files($files) {
   $copy_files = array();
+  $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
+  $files_dir = $wrapper->getDirectoryPath();
 
-  foreach($files as $file) {
+  foreach ($files as $file) {
     // Check if the file needs to be copied over.
     if (static_check_file(static_get_normal_cache_dir() . '/' . $file)) {
       // Make sure the destination exists.
@@ -23,7 +25,7 @@ function static_copy_files($files) {
       }
       // Special case for image styles. We can't directly copy if they haven't
       // been generated yet.
-      if (strpos($match, $files_dir . '/styles') === 0 && !file_exists(static_get_normal_cache_dir() . '/' . $file)) {
+      if (strpos($file, $files_dir . '/styles') === 0 && !file_exists(static_get_normal_cache_dir() . '/' . $file)) {
         // Should optimize this for multithreaded gets.
         $absolute_url = urldecode(url($match, array('absolute' => TRUE, 'alias' => TRUE)));
         httprl_request($absolute_url);
@@ -33,16 +35,103 @@ function static_copy_files($files) {
           static_write_file(static_get_normal_cache_dir() . '/' . $file, $request[$absolute_url]->data, 0644);
         }
       }
+      elseif (substr($file, -strlen('.css')) === '.css') {
+        // Process contents of css files for other linked data.
+        $contents = static_get_css_file_contents($file);
+        static_copy_linked_files($contents, dirname($file));
+        static_file_copy_to_cache_dir($file);
+      }
+      elseif (substr($file, -strlen('.js')) === '.js') {
+        // Process contents js files for other linked data.
+        $contents = file_get_contents($file);
+        static_copy_linked_files($contents, dirname($file));
+        static_file_copy_to_cache_dir($file);
+      }
       else {
-        // Process contents of css and js files as they could contain other linked data.
-        if (substr($file, -strlen('.css')) === '.css' || substr($file, -strlen('.js')) === '.js') {
-          $contents = file_get_contents($file);
-          static_copy_linked_files($contents, dirname($file));
-        }
-        copy($file, static_get_normal_cache_dir() . '/' . $file);
+        static_file_copy_to_cache_dir($file);
       }
     }
   }
+}
+
+/**
+ * Returns a clean file path.
+ *
+ * @param string $file_path
+ *   The file path.
+ * @param string $source_dir
+ *   Optional. A source directory for resolving relative paths.
+ *
+ * @return string
+ *   The clean file path.
+ */
+function static_clean_file_path($file_path, $source_dir = NULL) {
+  global $base_url;
+
+  // Strip off the querystring.
+  $clean = preg_replace('/\?.*/', '', $file_path);
+
+  // If path is relative, add on source base.
+  if ($source_dir && strpos($clean, '.') === 0) {
+    $clean = $source_dir . '/.' . $clean;
+  }
+
+  // Strip leading strings.
+  if (stripos($clean, 'http') === 0) {
+    // Process urls.
+    if (stripos($clean, $base_url . '/') === 0) {
+      // Strip base url.
+      $clean = str_replace($base_url . '/', '', $clean);
+    }
+    else {
+      // Remote files are not processed.
+      return '';
+    }
+  }
+  else {
+    // Strip leading "/".
+    $clean = ltrim($clean, '/');
+  }
+
+  return $clean;
+}
+
+/**
+ * Copy the source file to the static directory.
+ */
+function static_file_copy_to_cache_dir($source) {
+  @copy($source, static_get_normal_cache_dir() . '/' . $source);
+}
+
+/**
+ * Processes the contents of a css file.
+ *
+ * @param string $file_path
+ *   The css file path.
+ *
+ * @see drupal_build_css_cache()
+ */
+function static_get_css_file_contents($file_path) {
+  $contents = drupal_load_stylesheet($file_path, TRUE);
+  if (empty($contents)) {
+    return '';
+  }
+
+  // Build the base URL of this CSS file: start with the full URL.
+  $css_base_url = file_create_url($file_path);
+  // Move to the parent.
+  $css_base_url = substr($css_base_url, 0, strrpos($css_base_url, '/'));
+  // Simplify to a relative URL if the stylesheet URL starts with the
+  // base URL of the website.
+  if (substr($css_base_url, 0, strlen($GLOBALS['base_root'])) == $GLOBALS['base_root']) {
+    $css_base_url = substr($css_base_url, strlen($GLOBALS['base_root']));
+  }
+
+  _drupal_build_css_path(NULL, $css_base_url . '/');
+  // Anchor all paths in the CSS with its base URL, ignoring external and absolute paths.
+  $contents = preg_replace_callback('/url\(\s*[\'"]?(?![a-z]+:|\/+)([^\'")]+)[\'"]?\s*\)/i', '_drupal_build_css_path', $contents);
+
+  return $contents;
 }
 
 /**
