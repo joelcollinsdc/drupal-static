@@ -319,6 +319,13 @@ function static_expire_cache($paths) {
 }
 
 /**
+ * Implements hook_workbench_moderation_transition().
+ */
+function static_workbench_moderation_transition($node, $old_state, $new_state) {
+  static_set_expired('node/' . $node->nid);
+}
+
+/**
  * Function to set a path to regenerate.
  */
 function static_set_expired($path) {
@@ -478,7 +485,6 @@ function static_generate_file($path) {
     }
     else {
       // Allow other modules to respond to the file creation.
-      module_invoke_all('static_file', $info['file'], $data);
       $time += microtime(true);
       watchdog('static', 'Statically generated !file in !time seconds.', array('!file' => $info['file'], '!time' => $time), WATCHDOG_INFO);
     }
