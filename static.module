@@ -107,6 +107,30 @@ function static_menu() {
 }
 
 /**
+ * Implements hook_flush_caches().
+ */
+function static_flush_caches() {
+  // We can't get rid of the querystring but we can set it to nothing.
+  variable_set('css_js_query_string', "");
+}
+
+/**
+ * Implements hook_exit().
+ */
+function static_exit() {
+  global $base_url;
+
+  // Page contents are now stored in php's output buffer.
+  // Gets the contents of the output buffer and cleans it.
+  $page = ob_get_clean();
+
+  // Make all paths relative.
+  $page = str_replace($base_url, '', $page);
+
+  print $page;
+}
+
+/**
  * Static track paths.
  *
  * Use this function to tell the static module to track paths. This is useful
@@ -451,6 +475,8 @@ function static_generate_file($path) {
       watchdog('static', 'Failed to write file !file', array('!file' => $info['file']), WATCHDOG_ERROR);
     }
     else {
+      // Allow other modules to respond to the file creation.
+      module_invoke_all('static_file', $info['file'], $data);
       $time += microtime(true);
       watchdog('static', 'Statically generated !file in !time seconds.', array('!file' => $info['file'], '!time' => $time), WATCHDOG_INFO);
     }
