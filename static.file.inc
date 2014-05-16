@@ -221,6 +221,12 @@ function static_write_file($filename, $data, $chmod = 0644) {
     return FALSE;
   }
 
+  // If the file exists and the contents match, don't overwrite. This preserves
+  // the last modified date.
+  if (file_exists($filename) && md5(file_get_contents($filename)) == md5($data)) {
+    return TRUE;
+  }
+
   // Save the file to the system.
   if (file_put_contents($filename, $data) === FALSE) {
     watchdog('static', 'Could not create the file %file on your system', array('%file' => $filename), WATCHDOG_ERROR);

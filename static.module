@@ -330,6 +330,8 @@ function static_set_expired($path) {
 
     static_save_info($info);
 
+    module_invoke_all('static_expire', $path);
+
     $paths[$info['path']] = TRUE;
   }
 }
