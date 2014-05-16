@@ -429,18 +429,13 @@ function static_admin_paths_submit($form, &$form_state) {
     case t('Update'):
       switch ($form_state['values']['operation']) {
         case 'regenerate_paths':
-          db_update('static')
-            ->fields(array('status' => 0))
-            ->condition('id', $form_state['values']['items'], 'IN')
-            ->execute();
+          static_expire_multiple($form_state['values']['items']);
           break;
 
         case 'delete_paths':
           // Need to add a confirm form here as well as instructions that it
           // doesn't delete the generated files as well yet.
-          db_delete('static')
-            ->condition('id', $form_state['values']['items'], 'IN')
-            ->execute();
+          static_delete_multiple($form_state['values']['items']);
           break;
 
       }

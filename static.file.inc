@@ -233,7 +233,6 @@ function static_write_file($filename, $data, $chmod = 0644) {
     return FALSE;
   }
 
-  module_invoke_all('static_file', $filename, $data);
   // Chmod file so webserver can send it out.
   drupal_chmod($filename, $chmod);
   return TRUE;

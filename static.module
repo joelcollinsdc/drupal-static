@@ -281,6 +281,22 @@ function static_get_info($path) {
 }
 
 /**
+ * Load info by id.
+ */
+function static_load($id) {
+  $info = db_select('static', 's')
+    ->fields('s')
+    ->condition('id', $id)
+    ->execute()
+    ->fetchAssoc();
+
+  // Allow other modules to alter.
+  drupal_alter('static_info', $info);
+
+  return $info;
+}
+
+/**
  * Save a static path.
  */
 function static_save_info($info) {
@@ -350,14 +366,36 @@ function static_expire_dynamic() {
   $cache_time = variable_get('static_dynamic_cache_time', 300);
   // In case set to "never".
   if ($cache_time >= 0) {
-    db_update('static')
-      ->fields(array(
-        'status' => 0,
-      ))
+    $items = db_select('static', 's')
+      ->fields('s', array('id'))
       ->condition('dynamic', 1)
       ->condition('updated', REQUEST_TIME - $cache_time, '<=')
-      ->execute();
+      ->execute()
+      ->fetchAllKeyed(0,0);
+    static_expire_multiple($items);
   }
+}
+
+/**
+ * Expire multiple items at once.
+ */
+function static_expire_multiple($items) {
+  db_update('static')
+    ->fields(array('status' => 0))
+    ->condition('id', $items, 'IN')
+    ->execute();
+
+  module_invoke_all('static_expire_multiple', $items);
+}
+
+/**
+ * Delete multiple items at once.
+ */
+function static_delete_multiple($items) {
+  db_delete('static')
+    ->condition('id', $items, 'IN')
+    ->execute();
+  module_invoke_all('static_delete_multiple', $items);
 }
 
 /**
@@ -485,6 +523,8 @@ function static_generate_file($path) {
     }
     else {
       // Allow other modules to respond to the file creation.
+      module_invoke_all('static_file', $info['file'], $data);
+      
       $time += microtime(true);
       watchdog('static', 'Statically generated !file in !time seconds.', array('!file' => $info['file'], '!time' => $time), WATCHDOG_INFO);
     }
@@ -624,11 +664,12 @@ function static_regenerate() {
   // Make sure we know about all paths in case some got missed.
   static_refresh_paths();
 
-  db_update('static')
-    ->fields(array(
-      'status' => 0,
-    ))
-    ->execute();
+  $items = db_select('static', 's')
+    ->fields('s', array('id'))
+    ->execute()
+    ->fetchAllKeyed(0,0);
+
+  static_expire_multiple($items);
 
   return TRUE;
 }
