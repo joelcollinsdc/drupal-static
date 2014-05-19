@@ -488,7 +488,7 @@ function static_generate_file($path) {
 
     $newfile = static_filename($info);
     // Check to see if a file previously existed but is different.
-    if ($info['file'] != '' && $info['file'] != $newfile) {
+    if (isset($info['file']) && $info['file'] != '' && $info['file'] != $newfile) {
       static_redirect_page($info['file'], $newfile);
     }
 
@@ -501,17 +501,22 @@ function static_generate_file($path) {
     static_save_info($info);
 
     if (isset($info['pager']) && isset($info['pager_total'])) {
-      $pager_total = intval($info['pager_total']);
-      for ($i = 1; $i < $pager_total; $i++) {
-        $pager_path = $info['path'] . '?' . $info['pager'] . '=' . $i;
-        $pager_alias = $info['alias'] . '?' . $info['pager'] . '=' . $i;
-        $pager_paths[$pager_path] = array(
-          'path' => $pager_path,
-          'alias' => $pager_alias,
-          'dynamic' => 1,
-        );
+      // We only want to add pager pages for the root page.
+      if (strpos($info['alias'], 'page=') === FALSE) {
+        $pager_total = intval($info['pager_total']);
+        for ($i = 1; $i < $pager_total; $i++) {
+          $pager_path = $info['path'] . '?' . $info['pager'] . '=' . $i;
+          $pager_alias = $info['alias'] . '?' . $info['pager'] . '=' . $i;
+          $pager_paths[$pager_path] = array(
+            'path' => $pager_path,
+            'alias' => $pager_alias,
+            'dynamic' => 1,
+          );
+        }
+        if (isset($pager_paths)) {
+          static_track_paths($pager_paths);
+        }
       }
-      static_track_paths($pager_paths);
     }
 
     // Drupal creates absolute urls for many links. We need to make these
