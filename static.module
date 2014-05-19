@@ -380,6 +380,10 @@ function static_expire_dynamic() {
  * Expire multiple items at once.
  */
 function static_expire_multiple($items) {
+  $items = array_filter($items);
+  if (empty($items)) {
+    return;
+  }
   db_update('static')
     ->fields(array('status' => 0))
     ->condition('id', $items, 'IN')
@@ -392,6 +396,10 @@ function static_expire_multiple($items) {
  * Delete multiple items at once.
  */
 function static_delete_multiple($items) {
+  $items = array_filter($items);
+  if (empty($items)) {
+    return;
+  }
   db_delete('static')
     ->condition('id', $items, 'IN')
     ->execute();
