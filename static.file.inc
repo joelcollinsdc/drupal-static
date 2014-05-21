@@ -25,14 +25,13 @@ function static_copy_files($files) {
       }
       // Special case for image styles. We can't directly copy if they haven't
       // been generated yet.
-      if (strpos($file, $files_dir . '/styles') === 0 && !file_exists(static_get_normal_cache_dir() . '/' . $file)) {
+      if (strpos($file, $files_dir . '/styles') === 0 && !file_exists($file)) {
         // Should optimize this for multithreaded gets.
-        $absolute_url = urldecode(url($match, array('absolute' => TRUE, 'alias' => TRUE)));
-        httprl_request($absolute_url);
-        $request = httprl_send_request();
+        $absolute_url = urldecode(url($file, array('absolute' => TRUE, 'alias' => TRUE)));
+        $request = drupal_http_request($absolute_url);
 
-        if ($request[$absolute_url]->code == 200) {
-          static_write_file(static_get_normal_cache_dir() . '/' . $file, $request[$absolute_url]->data, 0644);
+        if ($request->code == 200) {
+          static_write_file(static_get_normal_cache_dir() . '/' . $file, $request->data, 0644);
         }
       }
       elseif (substr($file, -strlen('.css')) === '.css') {
