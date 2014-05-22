@@ -16,8 +16,10 @@ function static_copy_files($files) {
   $files_dir = $wrapper->getDirectoryPath();
 
   foreach ($files as $file) {
+    // File may be urlencoded.
+    $file = urldecode($file);
     // Check if the file needs to be copied over.
-    if (static_check_file(static_get_normal_cache_dir() . '/' . $file)) {
+    if (static_check_file($file)) {
       // Make sure the destination exists.
       $directory = dirname(static_get_normal_cache_dir() . '/' . $file);
       if (!static_mkdir($directory)) {
