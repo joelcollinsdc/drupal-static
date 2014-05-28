@@ -33,7 +33,9 @@ function static_copy_files($files) {
         $request = drupal_http_request($absolute_url);
 
         if ($request->code == 200) {
+          $oldumask = umask(0);
           static_write_file(static_get_normal_cache_dir() . '/' . $file, $request->data, 0644);
+          umask($oldumask);
         }
       }
       elseif (substr($file, -strlen('.css')) === '.css') {
@@ -101,7 +103,10 @@ function static_clean_file_path($file_path, $source_dir = NULL) {
  * Copy the source file to the static directory.
  */
 function static_file_copy_to_cache_dir($source) {
+  $oldumask = umask(0);
   @copy($source, static_get_normal_cache_dir() . '/' . $source);
+  chmod(static_get_normal_cache_dir() . '/' . $source, 0644);
+  umask($oldumask);
 }
 
 /**
@@ -252,12 +257,14 @@ function static_mkdir($directory) {
     }
 
     // Try to create the directory.
+    $oldumask = umask(0);
     $mode = variable_get('file_chmod_directory', 0777);
     if (!mkdir($directory, $mode, TRUE)) {
       watchdog('static', 'Could not create the directory %dir on your system', array('%dir' => $directory), WATCHDOG_ERROR);
+      umask($oldumask);
       return FALSE;
     }
-    drupal_chmod($directory);
+    umask($oldumask);
   }
   return TRUE;
 }
