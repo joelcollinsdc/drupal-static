@@ -335,13 +335,6 @@ function static_expire_cache($paths) {
 }
 
 /**
- * Implements hook_workbench_moderation_transition().
- */
-function static_workbench_moderation_transition($node, $old_state, $new_state) {
-  static_set_expired('node/' . $node->nid);
-}
-
-/**
  * Function to set a path to regenerate.
  */
 function static_set_expired($path) {
