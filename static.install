@@ -147,7 +147,10 @@ function static_requirements($phase) {
  * Create the htaccess file in the cache directory.
  */
 function static_create_htaccess($cache_directory) {
-  return copy(drupal_get_path('module', 'static') . '/static.htaccess', $cache_directory . '/.htaccess');
+  $oldumask = umask(0);
+  $result = copy(drupal_get_path('module', 'static') . '/static.htaccess', $cache_directory . '/.htaccess');
+  umask($oldumask);
+  return $result;
 }
 
 /**
