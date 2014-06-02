@@ -6,5 +6,4 @@ core = 7.x
 configure = admin/config/system/static/settings
 
 recommends[] = expire
-dependencies[] = httprl
 

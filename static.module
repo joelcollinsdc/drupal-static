@@ -468,13 +468,12 @@ function static_generate_file($path) {
   }
   $absolute_url = urldecode(url($info['alias'], array('absolute' => TRUE, 'alias' => TRUE)));
 
-  httprl_request($absolute_url, array('headers' => array('User-Agent' => 'Drupal Static (+http://drupal.org/project/static)')));
-  $request = httprl_send_request();
+  $request = drupal_http_request($absolute_url, array('headers' => array('User-Agent' => 'Drupal Static (+http://drupal.org/project/static)')));
 
   // Allow other modules to modify the response.
   drupal_alter('static_response', $info, $request);
 
-  if ($request[$absolute_url]->code == 200) {
+  if ($request->code == 200) {
     // Reload the static info as it may have changed during the request.
     // If the page has a pager it will have changed.
     $info = static_get_info($path);
@@ -488,8 +487,8 @@ function static_generate_file($path) {
     $info['file'] = $newfile;
 
     $info['updated'] = REQUEST_TIME;
-    $info['status'] = $request[$absolute_url]->code;
-    $info['status_message'] = $request[$absolute_url]->status_message;
+    $info['status'] = $request->code;
+    $info['status_message'] = $request->status_message;
 
     static_save_info($info);
 
@@ -514,7 +513,7 @@ function static_generate_file($path) {
 
     // Drupal creates absolute urls for many links. We need to make these
     // relative.
-    $data = str_replace($base_url, '', $request[$absolute_url]->data);
+    $data = str_replace($base_url, '', $request->data);
 
     static_copy_linked_files($data);
 
@@ -539,16 +538,16 @@ function static_generate_file($path) {
   else {
     // This can happen if something is deleted. We want to remove the
     // corresponding file.
-    if ($request[$absolute_url]->code == 404 && $info['file']) {
+    if ($request->code == 404 && $info['file']) {
       @unlink(static_get_normal_cache_dir() . '/' . $info['file']);
     }
-    $info['status'] = $request[$absolute_url]->code;
-    $info['status_message'] = $request[$absolute_url]->status_message;
+    $info['status'] = $request->code;
+    $info['status_message'] = $request->status_message;
     static_save_info($info);
 
     $time += microtime(true);
 
-    watchdog('static', 'Generation failed for !file with status !status in !time seconds.', array('!file' => $info['file'], '!time' => $time, '!status' => $request[$absolute_url]->code), WATCHDOG_INFO);
+    watchdog('static', 'Generation failed for !file with status !status in !time seconds.', array('!file' => $info['file'], '!time' => $time, '!status' => $request->code), WATCHDOG_INFO);
     $result = FALSE;
   }
   return $result;
