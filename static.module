@@ -237,7 +237,7 @@ function static_get_info($path) {
       // Build the paths with the original options for query, fragment.
       $url_options = array('alias' => TRUE) + $path_parts;
       unset($url_options['path']);
-      foreach (array('source', 'alias')  as $path_key) {
+      foreach (array('source', 'alias') as $path_key) {
         if (isset($path_alias[$path_key])) {
           $path_alias[$path_key] = url($path_alias[$path_key], $url_options);
           $path_alias[$path_key] = ltrim($path_alias[$path_key], '/');
@@ -245,7 +245,7 @@ function static_get_info($path) {
       }
     }
     else {
-      $source_path = drupal_get_normal_path($source_path);
+      $source_path = drupal_get_normal_path($path);
     }
 
     if (empty($path_alias)) {
@@ -325,8 +325,6 @@ function static_get_status() {
  * Implements hook_expire_cache().
  */
 function static_expire_cache($paths) {
-  global $base_root;
-
   if (variable_get('static_cron', TRUE)) {
     foreach ($paths as $path => $absolute) {
       static_set_expired($path);
@@ -364,7 +362,7 @@ function static_expire_dynamic() {
       ->condition('dynamic', 1)
       ->condition('updated', REQUEST_TIME - $cache_time, '<=')
       ->execute()
-      ->fetchAllKeyed(0,0);
+      ->fetchAllKeyed(0, 0);
     static_expire_multiple($items);
   }
 }
@@ -439,8 +437,15 @@ function static_cron_queue_info() {
  * entire cron run. See: drupal_cron_run().
  */
 function static_cron_generate_file($path) {
+  $return = FALSE;
   if (static_lock_acquire()) {
-    $return = static_generate_file($path);
+    // Would be nice to use finally{} but not available till PHP 5.5.
+    try {
+      $return = static_generate_file($path);
+    }
+    catch (Exception $e) {
+      static_lock_release();
+    }
     static_lock_release();
   }
   return $return;
@@ -457,7 +462,7 @@ function static_cron_generate_file($path) {
 function static_generate_file($path) {
   global $base_url;
 
-  $time = -microtime(true);
+  $time = -microtime(TRUE);
 
   $info = static_get_info($path);
   // If status is 1, we don't want to regenerate again. Only regenerated
@@ -529,8 +534,8 @@ function static_generate_file($path) {
     else {
       // Allow other modules to respond to the file creation.
       module_invoke_all('static_file', $info['file'], $data);
-      
-      $time += microtime(true);
+
+      $time += microtime(TRUE);
       watchdog('static', 'Statically generated !file in !time seconds.', array('!file' => $info['file'], '!time' => $time), WATCHDOG_INFO);
     }
   }
@@ -545,9 +550,17 @@ function static_generate_file($path) {
     $info['status_message'] = $request->status_message;
     static_save_info($info);
 
-    $time += microtime(true);
+    $time += microtime(TRUE);
 
-    watchdog('static', 'Generation failed for !file with status !status in !time seconds.', array('!file' => $info['file'], '!time' => $time, '!status' => $request->code), WATCHDOG_INFO);
+    watchdog('static',
+      'Generation failed for !file with status !status in !time seconds.',
+      array(
+        '!file' => $info['file'],
+        '!time' => $time,
+        '!status' => $request->code,
+      ),
+      WATCHDOG_INFO
+    );
     $result = FALSE;
   }
   return $result;
@@ -587,8 +600,6 @@ function static_copy_linked_files($data, $source_dir = '') {
   module_invoke_all('static_process', $data, $source_dir);
   // Should find a way of caching the results so we aren't constantly
   // checking common files.
-  $wrapper = file_stream_wrapper_get_instance_by_uri('public://');
-  $files_dir = $wrapper->getDirectoryPath();
   $matches = array();
   // Match include("/anything").
   $includes = array();
@@ -653,7 +664,7 @@ function static_generate_files($limit) {
       ->fetchAllAssoc('id');
 
   $count = 0;
-  foreach ($results as $id => $result) {
+  foreach ($results as $result) {
     $success = static_generate_file($result->path);
     if ($success) {
       $count++;
@@ -672,7 +683,7 @@ function static_regenerate() {
   $items = db_select('static', 's')
     ->fields('s', array('id'))
     ->execute()
-    ->fetchAllKeyed(0,0);
+    ->fetchAllKeyed(0, 0);
 
   static_expire_multiple($items);
 
@@ -797,7 +808,12 @@ function _static_batch_generating_finished($success, $results) {
       drupal_set_message(format_plural($results['generated'], 'Successfully generated 1 page', 'Successfully generated @pages pages', array('@pages' => $results['generated'])) . ' in ' . $total_time . ' seconds. (' . round($results['generated'] / $total_time, 2) . ' pages per second)');
 
       if (!empty($results['not generated'])) {
-       drupal_set_message(format_plural($results['not generated'], '1 page could not be generated. Check the logs for details.', '@count pages could not be generated. Check the logs for details.'), 'warning');
+        drupal_set_message(
+         format_plural($results['not generated'],
+           '1 page could not be generated. Check the logs for details.',
+           '@count pages could not be generated. Check the logs for details.'),
+         'warning'
+        );
       }
     }
     else {
@@ -817,7 +833,7 @@ function static_preprocess_pager(&$variables) {
   // by the static generation system. We can capture how many pages there are
   // here.
   if (!isset($_GET['page'])) {
-    global $pager_page_array, $pager_total, $user;
+    global $pager_total, $user;
     $path = $_GET['q'];
 
     // Not sure this is the best way to check for anonymous user access.
