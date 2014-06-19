@@ -123,6 +123,7 @@ function static_exit() {
   // Page contents are now stored in php's output buffer.
   // Gets the contents of the output buffer and cleans it.
   $page = ob_get_clean();
+  ob_start();
 
   // Make all paths relative.
   $page = str_replace($base_url, '', $page);
