@@ -103,9 +103,11 @@ function static_clean_file_path($file_path, $source_dir = NULL) {
  * Copy the source file to the static directory.
  */
 function static_file_copy_to_cache_dir($source) {
+  $dest = static_get_normal_cache_dir() . '/' . $source;
   $oldumask = umask(0);
-  @copy($source, static_get_normal_cache_dir() . '/' . $source);
-  chmod(static_get_normal_cache_dir() . '/' . $source, 0644);
+  if (@copy($source, $dest)) {
+    chmod($dest, 0644);
+  }
   umask($oldumask);
 }
 
