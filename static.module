@@ -833,7 +833,7 @@ function static_preprocess_pager(&$variables) {
   // This is called during the page generation process for each page, not
   // by the static generation system. We can capture how many pages there are
   // here.
-  if (!isset($_GET['page'])) {
+  if (!isset($_GET['page']) && !path_is_admin($_GET['q'])) {
     global $pager_total, $user;
     $path = $_GET['q'];
 
