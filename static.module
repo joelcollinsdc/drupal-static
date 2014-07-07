@@ -837,22 +837,41 @@ function static_preprocess_pager(&$variables) {
     global $pager_total, $user;
     $path = $_GET['q'];
 
-    // Not sure this is the best way to check for anonymous user access.
-    // If we don't check anonymous access, this adds many admin pages.
-    $current_user = $user;
-    $user = drupal_anonymous_user();
-    $menu_item = menu_get_item($path);
-    // Can't use $menu_item['access'] directly since it was cached.
-    _menu_check_access($menu_item, $menu_item['map']);
-    $user = $current_user;
+    $info = static_get_info($path);
+    if ($info) {
+      $pager_element = isset($variables['element']) ? $variables['element'] : NULL;
+      $current_pager_total = isset($pager_element) && isset($pager_total[$pager_element]) ? $pager_total[$pager_element] : NULL;
 
-    if ($menu_item['access']) {
-      $info = static_get_info($path);
-      // May be a better way of getting this but it is hardcoded in
-      // theme_pager_link().
-      $info['pager'] = 'page';
-      $info['pager_total'] = $pager_total[$variables['element']];
-      static_save_info($info);
+      // Update info if the pager total has changed.
+      if (!isset($current_pager_total)) {
+        // Unset existing info total.
+        if (!empty($info['pager_total'])) {
+          $info['pager'] = 'page';
+          $info['pager_total'] = NULL;
+          static_save_info($info);
+        }
+      }
+      elseif (!isset($info['pager']) || $info['pager'] != 'page' ||
+        !isset($info['pager_total']) || $info['pager_total'] != $current_pager_total) {
+        // Update info pager total.
+
+        // Not sure this is the best way to check for anonymous user access.
+        // If we don't check anonymous access, this adds many admin pages.
+        $current_user = $user;
+        $user = drupal_anonymous_user();
+        $menu_item = menu_get_item($path);
+        // Can't use $menu_item['access'] directly since it was cached.
+        _menu_check_access($menu_item, $menu_item['map']);
+        $user = $current_user;
+
+        if ($menu_item['access']) {
+          // May be a better way of getting this but it is hardcoded in
+          // theme_pager_link().
+          $info['pager'] = 'page';
+          $info['pager_total'] = $current_pager_total;
+          static_save_info($info);
+        }
+      }
     }
   }
 }
