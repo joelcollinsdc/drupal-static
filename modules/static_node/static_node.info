@@ -1,0 +1,8 @@
+name = Static Node
+description = Automatically discover all nodes.
+package = Performance and scalability
+core = 7.x
+
+dependencies[] = static
+dependencies[] = node
+
