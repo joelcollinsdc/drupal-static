@@ -237,10 +237,18 @@ function static_get_info($path) {
 
       // Build the paths with the original options for query, fragment.
       $url_options = array('alias' => TRUE) + $path_parts;
-      unset($url_options['path']);
-      foreach (array('source', 'alias') as $path_key) {
-        if (isset($path_alias[$path_key])) {
-          $path_alias[$path_key] = url($path_alias[$path_key], $url_options);
+      if ($path_alias) {
+        unset($url_options['path']);
+        foreach (array('source', 'alias') as $path_key) {
+          if (isset($path_alias[$path_key])) {
+            $path_alias[$path_key] = url($path_alias[$path_key], $url_options);
+            $path_alias[$path_key] = ltrim($path_alias[$path_key], '/');
+          }
+        }
+      }
+      else {
+        foreach (array('source', 'alias') as $path_key) {
+          $path_alias[$path_key] = url($source_path, $url_options);
           $path_alias[$path_key] = ltrim($path_alias[$path_key], '/');
         }
       }
@@ -313,12 +321,12 @@ function static_save_info($info) {
  */
 function static_get_status() {
   $query = db_select('static', 's')
-      ->fields('s', array('status'));
+    ->fields('s', array('status'));
   $query->addExpression('count(id)', 'count');
   $query->orderBy('status', 'ASC');
   $results = $query->groupBy('status')
-      ->execute()
-      ->fetchAll();
+    ->execute()
+    ->fetchAll();
   return $results;
 }
 
@@ -337,7 +345,7 @@ function static_expire_cache($paths) {
  * Function to set a path to regenerate.
  */
 function static_set_expired($path) {
-  $paths = &drupal_static(__FUNCTION__);
+  $paths = & drupal_static(__FUNCTION__);
 
   $info = static_get_info($path);
   if (!isset($paths[$info['path']])) {
@@ -443,8 +451,7 @@ function static_cron_generate_file($path) {
     // Would be nice to use finally{} but not available till PHP 5.5.
     try {
       $return = static_generate_file($path);
-    }
-    catch (Exception $e) {
+    } catch (Exception $e) {
       static_lock_release();
     }
     static_lock_release();
@@ -472,7 +479,10 @@ function static_generate_file($path) {
   if ($info['status']) {
     return TRUE;
   }
-  $absolute_url = urldecode(url($info['alias'], array('absolute' => TRUE, 'alias' => TRUE)));
+  $absolute_url = urldecode(url($info['alias'], array(
+    'absolute' => TRUE,
+    'alias' => TRUE
+  )));
 
   $request = drupal_http_request($absolute_url, array('headers' => array('User-Agent' => 'Drupal Static (+http://drupal.org/project/static)')));
 
@@ -537,7 +547,10 @@ function static_generate_file($path) {
       module_invoke_all('static_file', $info['file'], $data);
 
       $time += microtime(TRUE);
-      watchdog('static', 'Statically generated !file in !time seconds.', array('!file' => $info['file'], '!time' => $time), WATCHDOG_INFO);
+      watchdog('static', 'Statically generated !file in !time seconds.', array(
+        '!file' => $info['file'],
+        '!time' => $time
+      ), WATCHDOG_INFO);
     }
   }
 
@@ -658,11 +671,11 @@ function static_copy_linked_files($data, $source_dir = '') {
 function static_generate_files($limit) {
   // May be a way to do multiple requests at a time to optimize this.
   $results = db_select('static', 's')
-      ->fields('s')
-      ->condition('status', STATIC_EXPIRED)
-      ->range(0, $limit)
-      ->execute()
-      ->fetchAllAssoc('id');
+    ->fields('s')
+    ->condition('status', STATIC_EXPIRED)
+    ->range(0, $limit)
+    ->execute()
+    ->fetchAllAssoc('id');
 
   $count = 0;
   foreach ($results as $result) {
@@ -766,8 +779,7 @@ function _static_batch_generating_callback($batch_size, &$context) {
   try {
     $generated = static_generate_files($to_generate);
     $context['results']['generated'] += $generated;
-  }
-  catch (Exception $e) {
+  } catch (Exception $e) {
     watchdog_exception('static', $e);
     $vars['@message'] = $e->message;
     $context['message'] = t('An error occurred during generating: @message.', $vars);
@@ -810,10 +822,10 @@ function _static_batch_generating_finished($success, $results) {
 
       if (!empty($results['not generated'])) {
         drupal_set_message(
-         format_plural($results['not generated'],
-           '1 page could not be generated. Check the logs for details.',
-           '@count pages could not be generated. Check the logs for details.'),
-         'warning'
+          format_plural($results['not generated'],
+            '1 page could not be generated. Check the logs for details.',
+            '@count pages could not be generated. Check the logs for details.'),
+          'warning'
         );
       }
     }
@@ -852,7 +864,8 @@ function static_preprocess_pager(&$variables) {
         }
       }
       elseif (!isset($info['pager']) || $info['pager'] != 'page' ||
-        !isset($info['pager_total']) || $info['pager_total'] != $current_pager_total) {
+        !isset($info['pager_total']) || $info['pager_total'] != $current_pager_total
+      ) {
         // Update info pager total.
 
         // Not sure this is the best way to check for anonymous user access.
