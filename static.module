@@ -246,10 +246,9 @@ function static_get_info($path) {
           }
         }
       }
-      else {
+      elseif (!empty($path_parts['query'])) {
         foreach (array('source', 'alias') as $path_key) {
-          $path_alias[$path_key] = url($source_path, $url_options);
-          $path_alias[$path_key] = ltrim($path_alias[$path_key], '/');
+          $path_alias[$path_key] = $source_path . '?' . drupal_http_build_query($path_parts['query']);
         }
       }
     }
