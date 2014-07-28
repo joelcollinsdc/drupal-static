@@ -161,7 +161,10 @@ function static_track_path($path) {
   else {
     $info = static_get_info($path);
   }
-  static_save_info($info);
+  // Only process new paths.
+  if (!isset($info['id'])) {
+    static_save_info($info);
+  }
 }
 
 /**
