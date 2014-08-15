@@ -308,6 +308,9 @@ function static_load($id) {
  * Save a static path.
  */
 function static_save_info($info) {
+  // Allow other modules to modify before save.
+  drupal_alter('static_save_info', $info);
+
   $keys = array();
   if (isset($info['id'])) {
     $keys[] = 'id';
