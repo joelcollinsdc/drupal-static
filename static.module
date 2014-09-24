@@ -355,6 +355,7 @@ function static_expire_dynamic() {
       ->fields('s', array('id'))
       ->condition('dynamic', 1)
       ->condition('updated', REQUEST_TIME - $cache_time, '<=')
+      ->orderBy('updated')
       ->execute()
       ->fetchAllKeyed(0, 0);
     static_expire_multiple($items);
