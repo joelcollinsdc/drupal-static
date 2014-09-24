@@ -347,17 +347,21 @@ function static_set_expired($path) {
 /**
  * Expire all dynamic pages.
  */
-function static_expire_dynamic() {
+function static_expire_dynamic($limit = NULL) {
   $cache_time = variable_get('static_dynamic_cache_time', 300);
   // In case set to "never".
   if ($cache_time >= 0) {
-    $items = db_select('static', 's')
+     $query = db_select('static', 's')
       ->fields('s', array('id'))
       ->condition('dynamic', 1)
       ->condition('updated', REQUEST_TIME - $cache_time, '<=')
-      ->orderBy('updated')
-      ->execute()
-      ->fetchAllKeyed(0, 0);
+      ->orderBy('updated');
+
+    if (!empty($limit)) {
+      $query->range(0, $limit);
+    }
+
+    $items = $query->execute()->fetchAllKeyed(0, 0);
     static_expire_multiple($items);
   }
 }
@@ -397,7 +401,7 @@ function static_delete_multiple($items) {
  */
 function static_cron() {
   if (variable_get('static_cron', TRUE)) {
-    static_expire_dynamic();
+    static_expire_dynamic(variable_get('static_batch_size', STATIC_DEFAULT_CRON_LIMIT));
     $results = db_select('static', 's')
       ->fields('s', array('path'))
       ->condition('status', 0)
