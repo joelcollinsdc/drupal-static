@@ -335,6 +335,7 @@ function static_set_expired($path) {
   $info = static_get_info($path);
   if (!isset($paths[$info['path']])) {
     $info['status'] = STATIC_EXPIRED;
+    $info['queued'] = 0;
 
     static_save_info($info);
 
@@ -375,7 +376,7 @@ function static_expire_multiple($items) {
     return;
   }
   db_update('static')
-    ->fields(array('status' => 0))
+    ->fields(array('status' => STATIC_EXPIRED))
     ->condition('id', $items, 'IN')
     ->execute();
 
@@ -405,6 +406,7 @@ function static_cron() {
     $results = db_select('static', 's')
       ->fields('s', array('path'))
       ->condition('status', 0)
+      ->condition('queued', REQUEST_TIME - 3600, '<')
       ->execute()
       ->fetchAllKeyed(0, 0);
     foreach ($results as $path) {
@@ -412,6 +414,11 @@ function static_cron() {
       $queue = DrupalQueue::get('static');
       $queue->createItem($path);
     }
+    // Mark all items as added to the queue.
+    db_update('static')
+      ->fields(array('queued' => REQUEST_TIME))
+      ->condition('path', $results)
+      ->execute();
   }
 }
 
@@ -493,6 +500,7 @@ function static_generate_file($path) {
     $info['file'] = $newfile;
 
     $info['updated'] = REQUEST_TIME;
+    $info['queued'] = 0;
     $info['status'] = $request->code;
     $info['status_message'] = $request->status_message;
 

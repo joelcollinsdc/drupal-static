@@ -80,6 +80,13 @@ function static_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'queued' => array(
+        'description' => 'The UNIX timestamp of when added to queue.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
     ),
     'primary key' => array('id', 'path'),
     'indexes' => array(
@@ -173,5 +180,21 @@ function static_update_7000() {
   ));
   db_update('static')
     ->fields(array('status' => 0))
+    ->execute();
+}
+
+/**
+ * Add queued field.
+ */
+function static_update_7001() {
+  db_add_field('static', 'queued', array(
+    'description' => 'The UNIX timestamp of when added to queue.',
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+  ));
+  db_update('static')
+    ->fields(array('queued' => 0))
     ->execute();
 }
