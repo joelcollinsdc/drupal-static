@@ -908,7 +908,16 @@ function static_page_build(&$page) {
     STATIC_EXPIRED => 0,
     'total' => 0,
   );
-  $results = static_get_status();
+
+  $query = db_select('static', 's')
+    ->fields('s', array('status'));
+  // Don't count dynamic pages in the needs publishing list.
+  $query->condition('dynamic', 0);
+  $query->addExpression('count(id)', 'count');
+  $query->orderBy('status', 'ASC');
+  $results = $query->groupBy('status')
+    ->execute()
+    ->fetchAll();
 
   foreach ($results as $result) {
     $status[$result->status] = $result->count;
