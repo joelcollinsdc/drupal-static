@@ -364,7 +364,7 @@ function static_expire_dynamic($limit = NULL) {
     }
 
     $items = $query->execute()->fetchAllKeyed(0, 0);
-//    static_expire_multiple($items);
+    static_expire_multiple($items);
   }
 }
 
