@@ -234,7 +234,7 @@ function static_admin_confirm_submit(array $form, array &$form_state) {
 /**
  * Page callback for static status.
  */
-function static_admin_paths() {
+function static_admin_paths_list() {
   // Form to add a path to tracking.
   $form['new'] = array(
     '#type' => 'fieldset',
@@ -409,9 +409,9 @@ function static_admin_paths() {
 }
 
 /**
- * Submit handler for static_admin_paths().
+ * Submit handler for static_admin_paths_list().
  */
-function static_admin_paths_submit($form, &$form_state) {
+function static_admin_paths_list_submit($form, &$form_state) {
   switch ($form_state['values']['op']) {
     case t('Filter'):
     case t('Refine'):

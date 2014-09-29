@@ -77,7 +77,7 @@ function static_menu() {
     'title' => 'Paths',
     'description' => 'List of the paths currently being tracked by the static module.',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('static_admin_paths'),
+    'page arguments' => array('static_admin_paths_list'),
     'access arguments' => array('administer static site'),
     'type' => MENU_LOCAL_TASK,
     'file' => 'static.admin.inc',
@@ -449,7 +449,8 @@ function static_cron_generate_file($path) {
     // Would be nice to use finally{} but not available till PHP 5.5.
     try {
       $return = static_generate_file($path);
-    } catch (Exception $e) {
+    }
+    catch (Exception $e) {
       static_lock_release();
     }
     static_lock_release();
