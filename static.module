@@ -443,7 +443,6 @@ function static_cron_queue_info() {
  * entire cron run. See: drupal_cron_run().
  */
 function static_cron_generate_file($path) {
-  $return = FALSE;
   if (static_lock_acquire()) {
     // Would be nice to use finally{} but not available till PHP 5.5.
     try {
