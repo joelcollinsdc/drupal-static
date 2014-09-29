@@ -356,7 +356,8 @@ function static_expire_dynamic($limit = NULL) {
       ->fields('s', array('id'))
       ->condition('dynamic', 1)
       ->condition('updated', REQUEST_TIME - $cache_time, '<=')
-      ->orderBy('updated');
+      ->orderBy('updated')
+      ->addTag('static_expire_dynamic');
 
     if (!empty($limit)) {
       $query->range(0, $limit);
@@ -407,6 +408,7 @@ function static_cron() {
       ->fields('s', array('path'))
       ->condition('status', 0)
       ->condition('queued', REQUEST_TIME - 3600, '<')
+      ->addTag('static_cron_queue')
       ->execute()
       ->fetchAllKeyed(0, 0);
     foreach ($results as $path) {
@@ -671,6 +673,7 @@ function static_generate_files($limit) {
     ->fields('s')
     ->condition('status', STATIC_EXPIRED)
     ->range(0, $limit)
+    ->addTag('static_generate_files')
     ->execute()
     ->fetchAllAssoc('id');
 
@@ -693,6 +696,7 @@ function static_regenerate() {
 
   $items = db_select('static', 's')
     ->fields('s', array('id'))
+    ->addTag('static_regenerate')
     ->execute()
     ->fetchAllKeyed(0, 0);
 
