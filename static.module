@@ -411,16 +411,18 @@ function static_cron() {
       ->addTag('static_cron_queue')
       ->execute()
       ->fetchAllKeyed(0, 0);
-    foreach ($results as $path) {
-      // Put URLs in a queue for processing by cron.
-      $queue = DrupalQueue::get('static');
-      $queue->createItem($path);
+    if ($results) {
+      foreach ($results as $path) {
+        // Put URLs in a queue for processing by cron.
+        $queue = DrupalQueue::get('static');
+        $queue->createItem($path);
+      }
+      // Mark all items as added to the queue.
+      db_update('static')
+        ->fields(array('queued' => REQUEST_TIME))
+        ->condition('path', $results)
+        ->execute();
     }
-    // Mark all items as added to the queue.
-    db_update('static')
-      ->fields(array('queued' => REQUEST_TIME))
-      ->condition('path', $results)
-      ->execute();
   }
 }
 
