@@ -1,0 +1,7 @@
+name = Static File
+description = Automatically discover all managed files.
+package = Performance and scalability
+core = 7.x
+
+dependencies[] = static
+
