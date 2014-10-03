@@ -60,9 +60,9 @@ function static_file_static_refresh_paths() {
       ->addTag('static_file_refresh_paths')
       ->distinct();
 
-  $results = $query->execute()->fetchCol();
-  foreach($results as $uri) {
-    $paths[] = static_file_create_path($uri);
+  $result = $query->execute();
+  foreach($result as $record) {
+    $paths[] = static_file_create_path($record->uri);
   }
 
   return $paths;
