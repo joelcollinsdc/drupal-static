@@ -599,7 +599,7 @@ function static_filename($info) {
     $filename = $info['alias'];
 
     // If the filename does not have .html, add it.
-    if (substr_compare($filename, '.html', -5, 5) !== 0) {
+    if (!pathinfo($filename, PATHINFO_EXTENSION) && substr_compare($filename, '.html', -5, 5) !== 0) {
       $filename .= '.html';
     }
 
