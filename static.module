@@ -534,10 +534,13 @@ function static_generate_file($path) {
       }
     }
 
+    // Initialize data.
+    $data = $request->data;
+
     // Drupal creates absolute urls for many links. We need to make these
     // relative.
     if (!empty($request->headers['content-type']) && $request->headers['content-type'] == 'text/html') {
-      $data = str_replace($base_url, '', $request->data);
+      $data = str_replace($base_url, '', $data);
     }
 
     static_copy_linked_files($data);
