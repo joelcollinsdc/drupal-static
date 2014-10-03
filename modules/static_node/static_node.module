@@ -38,6 +38,7 @@ function static_node_static_refresh_paths() {
   $paths = array();
   $result = db_select('node', 'n')
     ->fields('n', array('nid'))
+    ->addTag('static_node_refresh_paths')
     ->execute();
   foreach($result as $record) {
     $paths[] = 'node/' . $record->nid;
