@@ -153,6 +153,11 @@ function static_check_file($file) {
     return FALSE;
   }
 
+  // Do not copy if the file cannot be read.
+  if (!is_readable($file)) {
+    return FALSE;
+  }
+
   // If the file doesn't exists, we should try to copy it over.
   if (!file_exists(static_get_normal_cache_dir() . '/' . $file)) {
     return TRUE;
