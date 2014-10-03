@@ -668,6 +668,8 @@ function static_copy_linked_files($data, $source_dir = '') {
     }
   }
 
+  drupal_alter('static_copy_files', $files);
+
   // Copy the files.
   static_copy_files($files);
 }
