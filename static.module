@@ -486,12 +486,26 @@ function static_generate_file($path) {
     'alias' => TRUE
   )));
 
+  // If the file exists, try to copy it directly.
   if (static_check_file($path)) {
     $directory = dirname(static_get_normal_cache_dir() . '/' . $path);
     if (!static_mkdir($directory)) {
       return FALSE;
     }
-    static_file_copy_to_cache_dir($path);
+    else {
+      static_file_copy_to_cache_dir($path);
+
+      $info['file'] = $path;
+
+      $info['updated'] = REQUEST_TIME;
+      $info['queued'] = 0;
+      $info['status'] = 200;
+      $info['status_message'] = 'File Copied';
+
+      static_save_info($info);
+
+      return TRUE;
+    }
   }
 
   $request = drupal_http_request($absolute_url, array(
