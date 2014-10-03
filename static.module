@@ -536,7 +536,9 @@ function static_generate_file($path) {
 
     // Drupal creates absolute urls for many links. We need to make these
     // relative.
-    $data = str_replace($base_url, '', $request->data);
+    if (!empty($request->headers['content-type']) && $request->headers['content-type'] == 'text/html') {
+      $data = str_replace($base_url, '', $request->data);
+    }
 
     static_copy_linked_files($data);
 
