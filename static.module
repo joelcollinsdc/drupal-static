@@ -486,6 +486,14 @@ function static_generate_file($path) {
     'alias' => TRUE
   )));
 
+  if (static_check_file($path)) {
+    $directory = dirname(static_get_normal_cache_dir() . '/' . $path);
+    if (!static_mkdir($directory)) {
+      return FALSE;
+    }
+    static_file_copy_to_cache_dir($path);
+  }
+
   $request = drupal_http_request($absolute_url, array(
     'headers' => array('User-Agent' => 'Drupal Static (+http://drupal.org/project/static)'),
     'timeout' => '300',
