@@ -402,6 +402,8 @@ function static_cron() {
       ->fields('s', array('path'))
       ->condition('status', 0)
       ->condition('queued', REQUEST_TIME - 3600, '<')
+      // Grab oldest first.
+      ->orderBy('updated', 'ASC')
       ->addTag('static_cron_queue')
       ->execute()
       ->fetchAllKeyed(0, 0);
