@@ -202,29 +202,6 @@ function static_redirect_page($oldfile, $newfile) {
 }
 
 /**
- * Create a lock file to indicate generation is in progress.
- * 
- * This is to aid in file deployment so we don't try to deploy a partially
- * generated site. It also prevents multiple generations running at the same
- * time.
- */
-function static_lock_acquire() {
-  $file = static_get_normal_cache_dir() . '/.static.lock';
-  if (!file_exists($file)) {
-    static_write_file($file, '');
-    return TRUE;
-  }
-  return FALSE;
-}
-
-/**
- * Remove the lock file to indicate generation is complete.
- */
-function static_lock_release() {
-  drupal_unlink(static_get_normal_cache_dir() . '/.static.lock');
-}
-
-/**
  * Write to a file. Ensures write is atomic via rename operation.
  */
 function static_write_file($filename, $data, $chmod = 0644) {

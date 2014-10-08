@@ -425,34 +425,12 @@ function static_cron() {
  */
 function static_cron_queue_info() {
   $queues['static'] = array(
-    'worker callback' => 'static_cron_generate_file',
+    'worker callback' => 'static_generate_file',
     // Max run time to claim per cron run (in seconds).
     'time' => variable_get('static_queue_seconds', 30),
   );
 
   return $queues;
-}
-
-/**
- * Generate a static html file callback for cron.
- *
- * We need an extra layer since we need to set the lock file during cron.
- * Unfortunately there is no easy way of doing this or blocking during the
- * entire cron run. See: drupal_cron_run().
- */
-function static_cron_generate_file($path) {
-  $return = FALSE;
-  if (static_lock_acquire()) {
-    // Would be nice to use finally{} but not available till PHP 5.5.
-    try {
-      $return = static_generate_file($path);
-    }
-    catch (Exception $e) {
-      static_lock_release();
-    }
-    static_lock_release();
-  }
-  return $return;
 }
 
 /**
@@ -756,10 +734,6 @@ function static_clear() {
  * Creates and sets a batch for generating items.
  */
 function _static_batch_generating_create($batch_size) {
-  if (!static_lock_acquire()) {
-    drupal_set_message(t('Unable to acquire lock. Generation may already be running or syncronization is in process. Please try again in a few minutes.'), 'warning');
-    return FALSE;
-  }
   $remaining = $batch_size;
   if ($batch_size !== 0) {
     if ($batch_size < 0) {
@@ -846,7 +820,6 @@ function _static_batch_generating_callback($batch_size, &$context) {
  * Batch API finishing callback for the generating functionality.
  */
 function _static_batch_generating_finished($success, $results) {
-  static_lock_release();
   // Display result messages.
   if ($success) {
     if (!empty($results['generated'])) {
