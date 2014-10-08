@@ -19,7 +19,7 @@ function static_views_static_refresh_paths() {
         if ($display->display_plugin == 'page' && strpos($display->display_options['path'], '%') === FALSE) {
           $paths[$display->display_options['path']] = array(
             'path' => $display->display_options['path'],
-            'dynamic' => 1,
+            'frequency' => 300,
           );
         }
       }

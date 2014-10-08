@@ -38,26 +38,6 @@ function static_admin_settings() {
     '#description'   => t("Set the publish button for administrators on the site."),
   );
 
-  $form['static_dynamic_cache_time'] = array(
-    '#type' => 'select',
-    '#title' => t('Dynamic Cache Refresh'),
-    '#default_value' => variable_get('static_dynamic_cache_time', 300),
-    '#options' => array(
-      0 => 'always',
-      60 => '1 minute',
-      300 => '5 minutes',
-      600 => '10 minutes',
-      1800 => '30 minutes',
-      3600 => '1 hour',
-      7200 => '2 hours',
-      18000 => '5 hours',
-      43200 => '12 hours',
-      86400 => '1 day',
-      -1 => 'never',
-    ),
-    '#description'   => t("Set how often dynamic pages should be regenerated with cron."),
-  );
-
   $form['static_queue_seconds'] = array(
     '#type' => 'textfield',
     '#title' => t('Time (in seconds) to use for generating static pages on every cron run'),
@@ -250,10 +230,10 @@ function static_admin_paths_list() {
     '#title' => 'Path',
   );
 
-  $form['new']['dynamic'] = array(
-    '#type' => 'checkbox',
-    '#title' => 'Dymamic',
-    '#description' => 'Check this box if the page has a list of content that should be updated regularly by cron such as a view page.',
+  $form['new']['frequency'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Frequency',
+    '#description' => 'How often this field should automatically refresh. Set to 0 for only when expired.',
   );
 
   $form['new']['add'] = array(
@@ -349,7 +329,7 @@ function static_admin_paths_list() {
     'path' => array('data' => t('Path'), 'field' => 's.path'),
     'alias' => array('data' => t('Alias'), 'field' => 's.alias'),
     'file' => array('data' => t('Generated File'), 'field' => 's.file'),
-    'dynamic' => array('data' => t('Dynamic Page'), 'field' => 's.dynamic'),
+    'frequency' => array('data' => t('Frequency'), 'field' => 's.frequency'),
     'status' => array('data' => t('Status'), 'field' => 's.status'),
     'status_message' => array('data' => t('Message')),
     'updated' => array(
@@ -390,7 +370,7 @@ function static_admin_paths_list() {
       'path' => check_plain($info->path),
       'alias' => check_plain($info->alias),
       'file' => check_plain($info->file),
-      'dynamic' => ($info->dynamic ? 'Yes' : 'No'),
+      'frequency' => $info->frequency,
       'status' => $info->status,
       'status_message' => $info->status_message,
       'updated' => format_date($info->updated, 'short'),

@@ -171,12 +171,12 @@ function static_static_refresh_paths() {
   $paths = array();
   $paths[''] = array(
     'path' => '<front>',
-    'dynamic' => 1,
+    'frequency' => 300,
   );
   $paths['node'] = array(
     'path' => 'node',
     'pager' => 'page',
-    'dynamic' => 1,
+    'frequency' => 300,
   );
   $site_404 = variable_get('site_404', '');
   if ($site_404 != '') {
@@ -348,22 +348,16 @@ function static_set_expired($path) {
 /**
  * Expire all dynamic pages.
  */
-function static_expire_dynamic($limit = NULL) {
-  $cache_time = variable_get('static_dynamic_cache_time', 300);
-  // In case set to "never".
-  if ($cache_time >= 0) {
-     $query = db_select('static', 's')
-      ->fields('s', array('id'))
-      ->condition('dynamic', 1)
-      ->condition('updated', REQUEST_TIME - $cache_time, '<=')
-      ->orderBy('updated')
-      ->addTag('static_expire_dynamic');
+function static_expire_dynamic() {
+   $query = db_select('static', 's')
+    ->fields('s', array('id'))
+    ->condition('frequency', 0, '!=')
+    ->where('updated + frequency <= :request_time', array(':request_time' => REQUEST_TIME))
+    ->orderBy('updated')
+    ->addTag('static_expire_dynamic');
 
-    if (!empty($limit)) {
-      $query->range(0, $limit);
-    }
-
-    $items = $query->execute()->fetchAllKeyed(0, 0);
+  $items = $query->execute()->fetchAllKeyed(0, 0);
+  if ($items) {
     static_expire_multiple($items);
   }
 }
@@ -403,7 +397,7 @@ function static_delete_multiple($items) {
  */
 function static_cron() {
   if (variable_get('static_cron', TRUE)) {
-    static_expire_dynamic(variable_get('static_batch_size', STATIC_DEFAULT_CRON_LIMIT));
+    static_expire_dynamic();
     $results = db_select('static', 's')
       ->fields('s', array('path'))
       ->condition('status', 0)
@@ -547,7 +541,7 @@ function static_generate_file($path) {
           $pager_paths[$pager_path] = array(
             'path' => $pager_path,
             'alias' => $pager_alias,
-            'dynamic' => 1,
+            'frequency' => 300,
           );
         }
         if (isset($pager_paths)) {
@@ -945,7 +939,7 @@ function static_page_build(&$page) {
   $query = db_select('static', 's')
     ->fields('s', array('status'));
   // Don't count dynamic pages in the needs publishing list.
-  $query->condition('dynamic', 0);
+  $query->condition('frequency', 0);
   $query->addExpression('count(id)', 'count');
   $query->orderBy('status', 'ASC');
   $results = $query->groupBy('status')

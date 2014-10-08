@@ -25,7 +25,7 @@ function static_esi_esi_block_url_alter(&$url) {
     array(
       array(
         'path' => $url,
-        'dynamic' => 1,
+        'frequency' => 300,
       ),
     )
   );
@@ -39,7 +39,7 @@ function static_esi_esi_context_url_alter($url) {
     array(
       array(
         'path' => $url,
-        'dynamic' => 1,
+        'frequency' => 300,
       ),
     )
   );
