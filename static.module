@@ -534,7 +534,7 @@ function static_generate_file($path) {
     $data = $request->data;
 
     // Only rewrite html files. Binary files should be passed through.
-    if (!empty($request->headers['content-type']) && $request->headers['content-type'] == 'text/html') {
+    if (!empty($request->headers['content-type']) && substr($request->headers['content-type'], 0, 9) == 'text/html') {
       // Drupal creates absolute urls for many links. We need to make these
       // relative.
       $data = str_replace($base_url, '', $request->data);
