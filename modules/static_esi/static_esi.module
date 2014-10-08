@@ -25,7 +25,7 @@ function static_esi_esi_block_url_alter(&$url) {
     array(
       array(
         'path' => $url,
-        'frequency' => 300,
+        'frequency' => static_esi_get_block_frequency($url),
       ),
     )
   );
@@ -39,10 +39,24 @@ function static_esi_esi_context_url_alter($url) {
     array(
       array(
         'path' => $url,
-        'frequency' => 300,
+        'frequency' => static_esi_get_block_frequency($url),
       ),
     )
   );
+}
+
+/**
+ * Get the esi_ttl from the block url.
+ */
+function static_esi_get_block_frequency($url) {
+  list($theme, $region, $module, $delta) = explode(':', arg(2, $url));
+  $block = block_load($module, $delta);
+  if ($block->esi_enabled) {
+    return $block->esi_ttl;
+  }
+  else {
+    return 0;
+  }
 }
 
 /**
@@ -77,7 +91,18 @@ function static_esi_form_block_admin_configure_alter(&$form, $form_state) {
  * When a block is saved, clear the static cache for that block.
  */
 function static_esi_block_admin_configure_form_submit($form, $form_state) {
-  $block = block_load($form_state['values']['module'], $form_state['values']['delta']);
-  $block->delta = esi_block__new_delta($form_state['values']['module'], $form_state['values']['delta']);
-  static_set_expired(esi_block_url($block));
+  if (isset($form_state['values']['esi_enabled']) && $form_state['values']['esi_enabled'] == 1) {
+    $block = block_load($form_state['values']['module'], $form_state['values']['delta']);
+    $block->delta = esi_block__new_delta($form_state['values']['module'], $form_state['values']['delta']);
+    static_set_expired(esi_block_url($block));
+    // Update all esi entries from this block with the new ttl.
+    if (isset($form_state['values']['esi_ttl'])) {
+      db_update('static')
+        ->fields(array(
+          'frequency' => $form_state['values']['esi_ttl'],
+        ))
+        ->condition('path', 'esi/block/%%:' . db_like($form_state['values']['module'] . ':' . $form_state['values']['delta']) . '%%', 'LIKE')
+        ->execute();
+    }
+  }
 }
