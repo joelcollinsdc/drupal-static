@@ -127,14 +127,16 @@ function static_requirements($phase) {
           'value'       => $t('Can not write to file-system'),
         );
       }
-      if (is_dir($cache_directory) && is_writable($cache_directory) && !file_exists($cache_directory . '/.htaccess')) {
-        if (!static_create_htaccess($cache_directory)) {
-          $requirements['static_htaccess'] = array(
-            'title'       => $t('Static'),
-            'description' => $t('Could not create .htaccess file.<br /> Attempted to create %file but did not have permission.', array('%file' => $cache_directory . '/.htaccess')),
-            'severity'    => REQUIREMENT_ERROR,
-            'value'       => $t('Can not write to file-system'),
-          );
+      if (variable_get('static_install_htaccess', TRUE)) {
+        if (is_dir($cache_directory) && is_writable($cache_directory) && !file_exists($cache_directory . '/.htaccess')) {
+          if (!static_create_htaccess($cache_directory)) {
+            $requirements['static_htaccess'] = array(
+              'title'       => $t('Static'),
+              'description' => $t('Could not create .htaccess file.<br /> Attempted to create %file but did not have permission.', array('%file' => $cache_directory . '/.htaccess')),
+              'severity'    => REQUIREMENT_ERROR,
+              'value'       => $t('Can not write to file-system'),
+            );
+          }
         }
       }
     }
