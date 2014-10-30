@@ -860,7 +860,16 @@ function _static_batch_generating_finished($success, $results) {
   if ($success) {
     if (!empty($results['generated'])) {
       $total_time = time() - $results['start'];
-      drupal_set_message(format_plural($results['generated'], 'Successfully generated 1 page', 'Successfully generated @pages pages', array('@pages' => $results['generated'])) . ' in ' . $total_time . ' seconds. (' . round($results['generated'] / $total_time, 2) . ' pages per second)');
+      $msg_tokens = array(
+        '@pages' => $results['generated'],
+        '@elapsed' => $total_time,
+        '@rate' => $total_time > 0 ? round($results['generated'] / $total_time, 2) : $results['generated'],
+      );
+      drupal_set_message(format_plural($results['generated'],
+        'Successfully generated 1 page in @elapsed seconds. (@rate pages per second)',
+        'Successfully generated @pages pages in @elapsed seconds. (@rate pages per second)',
+        $msg_tokens
+      ));
 
       if (!empty($results['not generated'])) {
         drupal_set_message(
