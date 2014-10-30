@@ -760,61 +760,95 @@ function _static_batch_generating_create($batch_size) {
 /**
  * Batch API callback for the generating functionality.
  */
-function _static_batch_generating_callback($batch_size, &$context) {
-  // Persistent data among batch runs.
-  if (!isset($context['sandbox']['batch_size'])) {
-    $context['sandbox']['batch_size'] = $batch_size;
-    $context['sandbox']['progress'] = 0;
-    $context['results']['start'] = time();
-  }
-
+function _static_batch_generating_callback($total_limit, &$context) {
+  $status = array();
   $query = db_select('static', 's');
   $query->fields('s');
   $query->condition('status', STATIC_EXPIRED);
   $result = $query->execute();
-  $context['sandbox']['remaining'] = $result->rowCount();
-  $context['sandbox']['limit'] = $context['sandbox']['progress'] + $context['sandbox']['remaining'];
+  $status['remaining'] = $result->rowCount();
+
+  // Persistent data among batch runs.
+  if (empty($context['sandbox'])) {
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['generated'] = 0;
+
+    // How many items do we want to index? All or a limited set of items.
+    if (empty($total_limit)) {
+      $context['sandbox']['max'] = $status['remaining'];
+    }
+    else {
+      $context['sandbox']['max'] = $total_limit;
+    }
+  }
 
   // Persistent data for results.
   if (!isset($context['results']['generated'])) {
     $context['results']['generated'] = 0;
     $context['results']['not generated'] = 0;
+    $context['results']['start'] = time();
   }
 
-  // Number of items to generate for this run.
-  $to_generate = min($context['sandbox']['remaining'], $context['sandbox']['batch_size']);
+  // We can safely process the static_batch_size nodes at a time without a
+  // timeout or out of memory error.
+  $limit = variable_get('static_batch_size', STATIC_DEFAULT_CRON_LIMIT);
 
-  // Index the items.
+  // Reduce the limit for our final batch if we would be processing more
+  // than had been requested.
+  if ($limit + $context['sandbox']['progress'] > $context['sandbox']['max']) {
+    $limit = $context['sandbox']['max'] - $context['sandbox']['progress'];
+  }
+
+  if ($context['sandbox']['max'] >= ($context['sandbox']['progress'] + $limit)) {
+    $context['sandbox']['progress'] += $limit;
+  }
+  else {
+    $context['sandbox']['progress'] = $context['sandbox']['max'];
+  }
+
+  // Generate the items.
   try {
-    $generated = static_generate_files($to_generate);
-    $context['results']['generated'] += $generated;
-  } catch (Exception $e) {
+    $generated = static_generate_files($limit);
+    $context['sandbox']['generated'] += $generated;
+  }
+  catch (Exception $e) {
     watchdog_exception('static', $e);
     $vars['@message'] = $e->message;
     $context['message'] = t('An error occurred during generating: @message.', $vars);
     $context['finished'] = 1;
-    $context['results']['not generated'] += $context['sandbox']['limit'] - $context['sandbox']['progress'];
+    $context['sandbox']['not generated'] += $context['sandbox']['max'] - $context['sandbox']['progress'];
     return;
   }
 
   // Display progress message.
   if ($generated > 0) {
-    $context['message'] = format_plural($context['results']['generated'], 'Successfully generated 1 item.', 'Successfully generated @count items.');
+    $msg_arguments = array(
+      '@current' => $context['sandbox']['progress'],
+      '@total' => $context['sandbox']['max'],
+      '@generated' => $context['sandbox']['generated'],
+      );
+    $context['message'] = t('Generated @generated items. Total generated: @current of @total items. ', $msg_arguments);
   }
 
   // Some items couldn't be generated.
-  if ($generated !== $to_generate) {
-    $context['results']['not generated'] += $to_generate - $generated;
+  if ($generated !== $limit) {
+    $context['sandbox']['not generated'] += $limit - $generated;
   }
 
-  $context['sandbox']['progress'] += $to_generate;
-
   // Everything has been generated.
-  if ($generated === 0 || $context['sandbox']['progress'] >= $context['sandbox']['limit']) {
+  if ($generated === 0 || $context['sandbox']['progress'] >= $context['sandbox']['max']) {
     $context['finished'] = 1;
   }
   else {
-    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['limit'];
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  }
+
+  // Put the total into the results section when we're finished so we can
+  // show it to the admin.
+  if ($context['finished']) {
+    $context['results']['count'] = $context['sandbox']['progress'];
+    $context['results']['generated'] = $context['sandbox']['generated'];
+    $context['results']['not generated'] = $context['sandbox']['not generated'];
   }
 }
 
