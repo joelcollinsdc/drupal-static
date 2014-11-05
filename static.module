@@ -770,6 +770,7 @@ function _static_batch_generating_callback($batch_size, &$context) {
 
   $query = db_select('static', 's');
   $query->fields('s');
+  $query->orderBy('updated', 'ASC');
   $query->condition('status', STATIC_EXPIRED);
   $result = $query->execute();
   $context['sandbox']['remaining'] = $result->rowCount();
