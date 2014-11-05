@@ -684,6 +684,7 @@ function static_generate_files($limit) {
   $results = db_select('static', 's')
     ->fields('s')
     ->condition('status', STATIC_EXPIRED)
+    ->orderBy('updated', 'ASC')
     ->range(0, $limit)
     ->addTag('static_generate_files')
     ->execute()
@@ -764,7 +765,6 @@ function _static_batch_generating_callback($total_limit, &$context) {
   $status = array();
   $query = db_select('static', 's');
   $query->fields('s');
-  $query->orderBy('updated', 'ASC');
   $query->condition('status', STATIC_EXPIRED);
   $result = $query->execute();
   $status['remaining'] = $result->rowCount();
