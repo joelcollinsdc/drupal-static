@@ -139,7 +139,12 @@ function static_admin_status_submit(array $form, array &$form_state) {
   switch ($values['op']) {
     case t('Publish now'):
       static_expire_dynamic();
-      _static_batch_generating_create(variable_get('static_batch_size', STATIC_DEFAULT_CRON_LIMIT));
+      $result = db_select('static', 's')
+        ->fields('s')
+        ->condition('status', 0)
+        ->execute();
+      $count = $result->rowCount();
+      _static_batch_generating_create($count);
       break;
 
     case t('Queue all items for regeneration'):
