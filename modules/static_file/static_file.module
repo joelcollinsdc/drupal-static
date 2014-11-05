@@ -77,11 +77,14 @@ function static_file_create_path($file_uri) {
     if ($stream_wrapper = file_stream_wrapper_get_instance_by_uri($file_uri)) {
       // Create path similar to file_create_url() but with base url.
       $file_path = str_replace('\\', '/', file_uri_target($file_uri));
-      $path = $stream_wrapper->getDirectoryPath() . '/' . drupal_encode_path($file_path);
+      $path = $stream_wrapper->getDirectoryPath() . '/' . $file_path;
     }
-    else {
+    elseif (drupal_substr($file_uri, 0, 1) == '/') {
+      $path = trim($file_uri, '/');
+    }
+    elseif ($url = file_create_url($file_uri)) {
       // Fallback to full url.
-      $path = file_create_url($file_uri);
+      $path = rawurldecode($url);
     }
   }
 
