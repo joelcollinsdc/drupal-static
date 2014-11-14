@@ -319,10 +319,8 @@ function static_get_status() {
  * Implements hook_expire_cache().
  */
 function static_expire_cache($paths) {
-  if (variable_get('static_cron', TRUE)) {
-    foreach ($paths as $path => $absolute) {
-      static_set_expired($path);
-    }
+  foreach ($paths as $path => $absolute) {
+    static_set_expired($path);
   }
 }
 
