@@ -706,9 +706,6 @@ function static_generate_files($limit) {
  * Set all pages to be regenerated.
  */
 function static_regenerate() {
-  // Make sure we know about all paths in case some got missed.
-  static_refresh_paths();
-
   $items = db_select('static', 's')
     ->fields('s', array('id'))
     ->addTag('static_regenerate')
@@ -739,11 +736,7 @@ function static_clear() {
  * Creates and sets a batch for generating items.
  */
 function _static_batch_generating_create($batch_size) {
-  $remaining = $batch_size;
-  if ($batch_size !== 0) {
-    if ($batch_size < 0) {
-      $batch_size = $remaining;
-    }
+  if ($batch_size > 0) {
     $batch = array(
       'title' => t('Generating pages'),
       'operations' => array(
@@ -829,7 +822,7 @@ function _static_batch_generating_callback($total_limit, &$context) {
       '@current' => $context['sandbox']['progress'],
       '@total' => $context['sandbox']['max'],
       '@generated' => $context['sandbox']['generated'],
-      );
+    );
     $context['message'] = t('Generated @generated items. Total generated: @current of @total items. ', $msg_arguments);
   }
 
@@ -889,6 +882,126 @@ function _static_batch_generating_finished($success, $results) {
   }
   else {
     drupal_set_message(t("An error occurred while trying to generate pages. Check the logs for details."), 'error');
+  }
+}
+
+/**
+ * Creates and sets a batch for generating items.
+ */
+function _static_batch_refresh_paths() {
+  $queue = DrupalQueue::get('static_refresh_paths');
+  $queue->createQueue();
+
+  // On larger sites this might run into php limit issues (memory and time).
+  $paths = module_invoke_all('static_refresh_paths');
+
+  drupal_alter('static_refresh_paths', $paths);
+
+  foreach ($paths as $path) {
+    $queue->createItem($path);
+  }
+
+  $batch_size = $queue->numberOfItems();
+  if ($batch_size > 0) {
+    $batch = array(
+      'title' => t('Refreshing paths'),
+      'operations' => array(
+        array('_static_batch_refresh_paths_callback', array($batch_size)),
+      ),
+      'progress_message' => t('Completed about @percentage% of the refreshing operation.'),
+      'finished' => '_static_batch_refresh_paths_finished',
+      'file' => drupal_get_path('module', 'static') . '/static.module',
+    );
+    batch_set($batch);
+    return TRUE;
+  }
+  drupal_set_message(t("Couldn't refresh paths."), 'warning');
+  return FALSE;
+}
+
+/**
+ * Batch API callback for the generating functionality.
+ */
+function _static_batch_refresh_paths_callback($total_limit, &$context) {
+  $queue = DrupalQueue::get('static_refresh_paths');
+  $status = array();
+  $status['remaining'] = $queue->numberOfItems();
+
+  // Persistent data among batch runs.
+  if (empty($context['sandbox'])) {
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['refreshed'] = 0;
+
+    // How many items do we want to index? All or a limited set of items.
+    if (empty($total_limit)) {
+      $context['sandbox']['max'] = $status['remaining'];
+    }
+    else {
+      $context['sandbox']['max'] = $total_limit;
+    }
+  }
+
+  // Persistent data for results.
+  if (!isset($context['results']['refreshed'])) {
+    $context['results']['refreshed'] = 0;
+  }
+
+  // We can safely process the static_batch_size nodes at a time without a
+  // timeout or out of memory error.
+  $limit = variable_get('static_batch_size', STATIC_DEFAULT_CRON_LIMIT);
+
+  // Reduce the limit for our final batch if we would be processing more
+  // than had been requested.
+  if ($limit + $context['sandbox']['progress'] > $context['sandbox']['max']) {
+    $limit = $context['sandbox']['max'] - $context['sandbox']['refreshed'];
+  }
+
+  // Refresh the items.
+  try {
+    for ($x = 0; $x < $limit; $x++) {
+      $item = $queue->claimItem();
+      static_track_path($item->data);
+      $queue->deleteItem($item);
+      $context['sandbox']['refreshed']++;
+    }
+  }
+  catch (Exception $e) {
+    watchdog_exception('static', $e);
+    $vars['@message'] = $e->message;
+    $context['message'] = t('An error occurred during refreshing: @message.', $vars);
+    $context['finished'] = 1;
+    return;
+  }
+
+  // Everything has been refreshed.
+  if ($queue->numberOfItems() == 0 || $context['sandbox']['refreshed'] >= $context['sandbox']['max']) {
+    $context['finished'] = 1;
+  }
+  else {
+    $context['finished'] = $context['sandbox']['refreshed'] / $context['sandbox']['max'];
+  }
+
+  // Put the total into the results section when we're finished so we can
+  // show it to the admin.
+  if ($context['finished']) {
+    $context['results']['refreshed'] = $context['sandbox']['refreshed'];
+  }
+}
+
+/**
+ * Batch API finishing callback for the refreshing paths functionality.
+ */
+function _static_batch_refresh_paths_finished($success, $results) {
+  // Display result messages.
+  if ($success) {
+    drupal_set_message(format_plural($results['refreshed'],
+      'Successfully refreshed 1 path.',
+      'Successfully refreshed @count paths.',
+      array('@count' => $results['refreshed'])
+    ));
+  }
+  else {
+    drupal_set_message(t("An error occurred while trying to refresh paths. Check the logs for details."), 'error');
   }
 }
 

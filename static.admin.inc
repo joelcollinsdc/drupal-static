@@ -114,6 +114,11 @@ function static_admin_status() {
     '#value' => t('Publish now'),
   );
 
+  $form['actions']['refresh_paths'] = array(
+    '#type' => 'submit',
+    '#value' => t('Refresh path list'),
+  );
+
   $form['actions']['regenerate'] = array(
     '#type' => 'submit',
     '#value' => t('Queue all items for regeneration'),
@@ -138,13 +143,16 @@ function static_admin_status_submit(array $form, array &$form_state) {
 
   switch ($values['op']) {
     case t('Publish now'):
-      static_expire_dynamic();
       $result = db_select('static', 's')
         ->fields('s')
         ->condition('status', 0)
         ->execute();
       $count = $result->rowCount();
       _static_batch_generating_create($count);
+      break;
+
+    case t('Refresh path list'):
+      _static_batch_refresh_paths();
       break;
 
     case t('Queue all items for regeneration'):
