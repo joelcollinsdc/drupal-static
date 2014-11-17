@@ -294,11 +294,14 @@ function static_save_info($info) {
   // Allow other modules to modify before save.
   drupal_alter('static_save_info', $info);
 
-  $keys = array();
-  if (isset($info['id'])) {
-    $keys[] = 'id';
+  // Allow cancelling the save by returning FALSE.
+  if ($info) {
+    $keys = array();
+    if (isset($info['id'])) {
+      $keys[] = 'id';
+    }
+    drupal_write_record('static', $info, $keys);
   }
-  drupal_write_record('static', $info, $keys);
 }
 
 /**
