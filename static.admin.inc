@@ -12,6 +12,14 @@
  * @see system_settings_form()
  */
 function static_admin_settings() {
+  $form['static_prod_site'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Production host'),
+    '#weight' => -10,
+    '#description' => t('Enter the production url with the protocol (http://) but without a trailing slash. This is used for RSS feeds and can be used for other uses.'),
+    '#default_value' => variable_get('static_prod_site', $GLOBALS['base_url']),
+  );
+
   $form['static_root_cache_dir'] = array(
     '#type' => 'textfield',
     '#title' => t('Root cache directory'),

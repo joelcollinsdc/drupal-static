@@ -544,6 +544,12 @@ function static_generate_file($path) {
       static_copy_linked_files($data);
     }
 
+    // RSS feeds need the production site as they are absolute.
+    if (!empty($request->headers['content-type']) && substr($request->headers['content-type'], 0, 19) == 'application/rss+xml') {
+      // Change the absolute urls to point to the production site.
+      $data = str_replace($base_url, variable_get('static_prod_site', $base_url), $request->data);
+    }
+
     // Set to 755 so ssi can include.
     $result = static_write_file(static_get_normal_cache_dir() . '/' . $info['file'], $data, 0755);
 
