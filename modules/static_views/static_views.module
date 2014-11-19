@@ -16,7 +16,7 @@ function static_views_static_refresh_paths() {
   foreach ($views as $view) {
     if (!$view->disabled) {
       foreach ($view->display as $id => $display) {
-        if ($display->display_plugin == 'page' && strpos($display->display_options['path'], '%') === FALSE) {
+        if (in_array($display->display_plugin, array('page', 'feed')) && strpos($display->display_options['path'], '%') === FALSE) {
           $paths[$display->display_options['path']] = array(
             'path' => $display->display_options['path'],
             'frequency' => 300,
@@ -25,5 +25,21 @@ function static_views_static_refresh_paths() {
       }
     }
   }
+  // Check access for anonymous to prevent adding admin pages.
+  // Force the current user to anonymous to ensure consistent permissions.
+  $original_user = $GLOBALS['user'];
+  $GLOBALS['user'] = drupal_anonymous_user();
+
+  foreach ($paths as $path => $info) {
+    if ($router_item = menu_get_item($path)) {
+      if (!$router_item['access']) {
+        unset($paths[$path]);
+      }
+    }
+  }
+
+  // Restore the user.
+  $GLOBALS['user'] = $original_user;
+
   return $paths;
 }

@@ -890,6 +890,9 @@ function _static_batch_generating_finished($success, $results) {
  */
 function _static_batch_refresh_paths() {
   $queue = DrupalQueue::get('static_refresh_paths');
+  // Make sure the queue is empty before we begin.
+  $queue->deleteQueue();
+  // Ensure the queue is created.
   $queue->createQueue();
 
   // On larger sites this might run into php limit issues (memory and time).
