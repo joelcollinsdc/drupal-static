@@ -11,12 +11,44 @@
  * Refresh all paths for the static module.
  */
 function static_views_static_refresh_paths() {
-  $paths = array();
   $views = views_get_all_views();
+  return static_views_discover_paths($views);
+}
+
+/**
+ * Implements hook_views_default_views_alter().
+ */
+function static_views_views_default_views_alter($views) {
+  $paths = static_views_discover_paths($views);
+  static_track_paths($paths);
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function static_views_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == 'views_ui_edit_form') {
+    $form['actions']['save']["#submit"][] = 'static_views_views_ui_edit_view_form_submit';
+  }
+}
+
+/**
+ * Submit callback when saving a view.
+ */
+function static_views_views_ui_edit_view_form_submit($form, $form_state) {
+  $paths = static_views_discover_paths(array($form_state['view']));
+  static_track_paths($paths);
+}
+
+/**
+ * Search a list of views for any paths that should be added to static.
+ */
+function static_views_discover_paths($views) {
+  $paths = array();
   foreach ($views as $view) {
     if (!$view->disabled) {
       foreach ($view->display as $id => $display) {
-        if (in_array($display->display_plugin, array('page', 'feed')) && strpos($display->display_options['path'], '%') === FALSE) {
+        if (isset($display->display_options['path']) && strpos($display->display_options['path'], '%') === FALSE) {
           $paths[$display->display_options['path']] = array(
             'path' => $display->display_options['path'],
             'frequency' => 300,
