@@ -353,7 +353,6 @@ function static_expire_dynamic() {
    $query = db_select('static', 's')
     ->fields('s', array('id'))
     ->condition('frequency', 0, '!=')
-    ->condition('status', 200)
     ->where('updated + frequency <= :request_time', array(':request_time' => REQUEST_TIME))
     ->orderBy('updated')
     ->addTag('static_expire_dynamic');
