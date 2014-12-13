@@ -498,13 +498,13 @@ function static_generate_file($path) {
 
   // Safety check.
   // If a PHP Fatal Error occurs with error_reporting off it will return
-  // an empty string with status 200.
-  if ($status == 200 && empty($data)) {
+  // an empty string with status 200. ESI can be blank.
+  if ($status == 200 && empty($data) && substr($info['path'], 0, 4) !== 'esi/') {
     $status = 500;
     $status_message = 'Empty Response';
   }
 
-  if ($status == 200 && strlen($data) > 0) {
+  if ($status == 200) {
     // Reload the static info as it may have changed during the request.
     // If the page has a pager it will have changed.
     $info = static_get_info($path);
