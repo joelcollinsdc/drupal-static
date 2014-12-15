@@ -361,9 +361,9 @@ function static_admin_paths_list() {
   );
 
   $query = db_select('static', 's')
-      ->extend('PagerDefault')
-      ->extend('TableSort')
-      ->fields('s');
+    ->extend('PagerDefault')
+    ->extend('TableSort')
+    ->fields('s');
   $options = array();
   foreach ($session as $index => $filter) {
     if ($filter == '') {
@@ -430,7 +430,25 @@ function static_admin_paths_list_submit($form, &$form_state) {
     case t('Update'):
       switch ($form_state['values']['operation']) {
         case 'regenerate_paths':
-          static_expire_multiple($form_state['values']['items']);
+          $items = array_filter($form_state['values']['items']);
+          if (empty($items)) {
+            break;
+          }
+
+          foreach ($items as $item) {
+            $static_info = static_load($item);
+            $static_info['status'] = 0;
+            static_save_info($static_info);
+
+            $result = static_generate_file($static_info['path']);
+
+            if ($result) {
+              drupal_set_message('Successfully generated ' . $static_info['path']);
+            }
+            else {
+              drupal_set_message('Unable to generate ' . $static_info['path'], 'error');
+            }
+          }
           break;
 
         case 'delete_paths':

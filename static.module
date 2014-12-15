@@ -103,7 +103,36 @@ function static_menu() {
     'file' => 'static.admin.inc',
   );
 
+  $items['static/generate/%static'] = array(
+    'title' => 'Status',
+    'page callback' => 'static_quick_generate_page',
+    'page arguments' => array(2),
+    'access arguments' => array('administer static site'),
+    'type' => MENU_CALLBACK,
+  );
+
   return $items;
+}
+
+
+/**
+ * Page callback to generate a specific page.
+ */
+function static_quick_generate_page($static_info) {
+  // Force static to be 0 so it will regenerate.
+  $static_info['status'] = 0;
+  static_save_info($static_info);
+
+  $result = static_generate_file($static_info['path']);
+
+  if ($result) {
+    drupal_set_message('Successfully generated ' . $static_info['path']);
+  }
+  else {
+    drupal_set_message('Unable to generate ' . $static_info['path'], 'error');
+  }
+  // Go to either redirect location or home.
+  drupal_goto();
 }
 
 /**
@@ -700,6 +729,7 @@ function static_generate_files($limit) {
   $results = db_select('static', 's')
     ->fields('s')
     ->condition('status', STATIC_EXPIRED)
+    ->orderBy('IF(frequency = 0, 1, 0)', 'DESC')
     ->orderBy('updated', 'ASC')
     ->range(0, $limit)
     ->addTag('static_generate_files')
