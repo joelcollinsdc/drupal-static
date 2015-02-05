@@ -611,7 +611,12 @@ function static_generate_file($path) {
   else {
     // This can happen if something is deleted. We want to remove the
     // corresponding file.
-    if ($request->code == 404 && $info['file']) {
+    $delete_statuses = array(
+      403,
+      404
+    );
+    drupal_alter('static_delete_statuses', $delete_statuses);
+    if (in_array($request->code, $delete_statuses) && $info['file']) {
       @unlink(static_get_normal_cache_dir() . '/' . $info['file']);
     }
     $info['status'] = $status;
