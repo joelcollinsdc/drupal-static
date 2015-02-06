@@ -257,6 +257,13 @@ function static_admin_paths_list() {
     '#description' => 'How often this field should automatically refresh. Set to 0 for only when expired.',
   );
 
+  $form['new']['priority'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Priority',
+    '#description' => 'Set the priority for this path.',
+    '#default_value' => 0,
+  );
+
   $form['new']['add'] = array(
     '#type' => 'submit',
     '#value' => t('Add'),
@@ -332,6 +339,8 @@ function static_admin_paths_list() {
   $options = array(
     'regenerate_paths' => 'Regenerate Paths',
     'delete_paths' => 'Delete Paths',
+    'set_priority' => 'Set Priority',
+    'unset_priority' => 'Unset Priority',
   );
   $form['options']['operation'] = array(
     '#type' => 'select',
@@ -351,6 +360,7 @@ function static_admin_paths_list() {
     'alias' => array('data' => t('Alias'), 'field' => 's.alias'),
     'file' => array('data' => t('Generated File'), 'field' => 's.file'),
     'frequency' => array('data' => t('Frequency'), 'field' => 's.frequency'),
+    'priority' => array('data' => t('Priority'), 'field' => 's.priority'),
     'status' => array('data' => t('Status'), 'field' => 's.status'),
     'status_message' => array('data' => t('Message')),
     'updated' => array(
@@ -392,6 +402,7 @@ function static_admin_paths_list() {
       'alias' => check_plain($info->alias),
       'file' => check_plain($info->file),
       'frequency' => $info->frequency,
+      'priority' => $info->priority,
       'status' => $info->status,
       'status_message' => $info->status_message,
       'updated' => format_date($info->updated, 'short'),
@@ -455,6 +466,28 @@ function static_admin_paths_list_submit($form, &$form_state) {
           // Need to add a confirm form here as well as instructions that it
           // doesn't delete the generated files as well yet.
           static_delete_multiple($form_state['values']['items']);
+          break;
+
+        case 'set_priority':
+          $items = array_filter($form_state['values']['items']);
+          if (empty($items)) {
+            break;
+          }
+          db_update('static')
+            ->fields(array('priority' => 1))
+            ->condition('id', $items)
+            ->execute();
+          break;
+
+        case 'unset_priority':
+          $items = array_filter($form_state['values']['items']);
+          if (empty($items)) {
+            break;
+          }
+          db_update('static')
+            ->fields(array('priority' => 0))
+            ->condition('id', $items)
+            ->execute();
           break;
 
       }

@@ -735,6 +735,7 @@ function static_generate_files($limit) {
     ->fields('s')
     ->condition('status', STATIC_EXPIRED)
     ->orderBy('IF(frequency = 0, 1, 0)', 'DESC')
+    ->orderBy('priority', 'DESC')
     ->orderBy('updated', 'ASC')
     ->range(0, $limit)
     ->addTag('static_generate_files')
