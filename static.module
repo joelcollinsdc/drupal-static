@@ -370,6 +370,7 @@ function static_set_expired($path) {
     static_save_info($info);
 
     module_invoke_all('static_expire', $path);
+    watchdog('static', 'Static item manually expired: !id => !path', array('!id' => $info['id'], '!path' => $info['path']), WATCHDOG_DEBUG);
 
     $paths[$info['path']] = TRUE;
   }
@@ -405,6 +406,9 @@ function static_expire_multiple($items) {
     ->condition('id', $items, 'IN')
     ->execute();
 
+  foreach ($items as $item) {
+    watchdog('static', 'Static item automatically expired: !id', array('!id' => $item), WATCHDOG_DEBUG);
+  }
   module_invoke_all('static_expire_multiple', $items);
 }
 
@@ -551,8 +555,6 @@ function static_generate_file($path) {
     $info['status'] = $status;
     $info['status_message'] = $status_message;
 
-    static_save_info($info);
-
     if (isset($info['pager']) && isset($info['pager_total'])) {
       // We only want to add pager pages for the root page.
       if (strpos($info['alias'], 'page=') === FALSE) {
@@ -600,11 +602,11 @@ function static_generate_file($path) {
       // Allow other modules to respond to the file creation.
       module_invoke_all('static_file', $info['file'], $data);
 
-      $time += microtime(TRUE);
-      watchdog('static', 'Statically generated !file in !time seconds.', array(
+      watchdog('static', 'Static item generated: !id, !path, !file.', array(
+        '!id' => $info['id'],
+        '!path' => $info['path'],
         '!file' => $info['file'],
-        '!time' => $time
-      ), WATCHDOG_INFO);
+      ), WATCHDOG_DEBUG);
     }
   }
 
@@ -621,21 +623,25 @@ function static_generate_file($path) {
     }
     $info['status'] = $status;
     $info['status_message'] = $status_message;
-    static_save_info($info);
-
-    $time += microtime(TRUE);
 
     watchdog('static',
-      'Generation failed for !file with status !status in !time seconds.',
+      'Static generation failed for !id, !file with status !status',
       array(
+        '!id' => $info['id'],
         '!file' => $info['file'],
-        '!time' => $time,
         '!status' => $status,
       ),
       WATCHDOG_INFO
     );
     $result = FALSE;
   }
+
+  // Save all changes.
+  $time += microtime(TRUE);
+  $info['duration'] = $time;
+
+  static_save_info($info);
+
   return $result;
 }
 

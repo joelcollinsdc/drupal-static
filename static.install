@@ -79,6 +79,11 @@ function static_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'duration' => array(
+        'description' => 'The duration of the last generation in microseconds.',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
       'queued' => array(
         'description' => 'The UNIX timestamp of when added to queue.',
         'type' => 'int',
@@ -243,4 +248,15 @@ function static_update_7003() {
   db_update('static')
     ->fields(array('priority' => 0))
     ->execute();
+}
+
+/**
+ * Add duration field.
+ */
+function static_update_7004() {
+  db_add_field('static', 'duration', array(
+    'description' => 'The duration of the last generation in microseconds.',
+    'type' => 'float',
+    'not null' => FALSE,
+  ));
 }
