@@ -406,10 +406,7 @@ function static_expire_multiple($items) {
     ->condition('id', $items, 'IN')
     ->execute();
 
-  foreach ($items as $item) {
-    watchdog('static', 'Static item automatically expired: !id', array('!id' => $item), WATCHDOG_DEBUG);
-  }
-  module_invoke_all('static_expire_multiple', $items);
+  watchdog('static', 'Static items automatically expired: !id', array('!id' => implode(',', $items)), WATCHDOG_DEBUG);
 }
 
 /**
@@ -595,7 +592,7 @@ function static_generate_file($path) {
     if (!$result) {
       $info['status'] = 500;
       $info['status_message'] = 'Failed to write file.';
-      static_save_info($info);
+
       watchdog('static', 'Failed to write file !file', array('!file' => $info['file']), WATCHDOG_ERROR);
     }
     else {
