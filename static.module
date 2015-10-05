@@ -115,6 +115,14 @@ function static_menu() {
 }
 
 
+function static_pathauto_alias_alter(&$alias, array &$context) {
+  //dpm($alias);
+  //dpm($context);
+  $alias = str_replace('.html/', '/', $alias);
+  $alias .= '.html';
+}
+
+
 /**
  * Page callback to generate a specific page.
  */

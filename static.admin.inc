@@ -20,6 +20,13 @@ function static_admin_settings() {
     '#default_value' => variable_get('static_prod_site', $GLOBALS['base_url']),
   );
 
+  $form['static_no_mod_rewrite'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Host has no Mod Rewrite support'),
+    '#description' => t('If checked, Static Generator will try to add .html to add drupal aliases.  Use only if publishing somewhere where Mod Rewrite is not available.'),
+    '#default_value' => variable_get('static_no_mod_rewrite', 0),
+  );
+
   $form['static_root_cache_dir'] = array(
     '#type' => 'textfield',
     '#title' => t('Root cache directory'),
